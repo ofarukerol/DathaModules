@@ -75,6 +75,7 @@ export const supportTicketService = {
     /**
      * Ticket oluştur: önce SQLite'a kaydet (her zaman başarılı),
      * sonra online ise backend'e push dene.
+     * Web mode (db = null): doğrudan API'ye gönder.
      */
     async create(dto: {
         subject: string;
@@ -83,6 +84,13 @@ export const supportTicketService = {
         priority?: SupportTicketPriority;
     }): Promise<SupportTicket> {
         const db = await getReadyDb();
+
+        // Web mode (DathaManager): SQLite yok, doğrudan API çağır
+        if (!db) {
+            const { data } = await api.post<ApiResponse<SupportTicket>>('/support-tickets', dto);
+            return data.data;
+        }
+
         const id = crypto.randomUUID();
         const now = new Date().toISOString();
         const userId = getUserId();
@@ -174,9 +182,24 @@ export const supportTicketService = {
 
     /**
      * Ticket listesi: local SQLite'dan oku + online ise backend ile merge et.
+     * Web mode (db = null): doğrudan API'den çek.
      */
     async getMyTickets(page = 1, limit = 50): Promise<{ data: SupportTicket[]; total: number }> {
         const db = await getReadyDb();
+
+        // Web mode (DathaManager): SQLite yok, doğrudan API'den çek
+        if (!db) {
+            if (!isOnline()) return { data: [], total: 0 };
+            try {
+                const { data } = await api.get<ApiResponse<any>>('/support-tickets', { params: { page, limit } });
+                const payload = data.data;
+                const remoteTickets: SupportTicket[] = Array.isArray(payload) ? payload : (payload?.data ?? []);
+                return { data: remoteTickets, total: remoteTickets.length };
+            } catch {
+                return { data: [], total: 0 };
+            }
+        }
+
         let localTickets: SupportTicket[] = [];
 
         // 1. Local'den oku (her zaman çalışır)
@@ -242,9 +265,17 @@ export const supportTicketService = {
 
     /**
      * Tek ticket detayı + mesajları
+     * Web mode (db = null): doğrudan API'den çek.
      */
     async getOne(id: string): Promise<SupportTicket> {
         const db = await getReadyDb();
+
+        // Web mode (DathaManager): SQLite yok, doğrudan API'den çek
+        if (!db) {
+            const { data } = await api.get<ApiResponse<SupportTicket>>(`/support-tickets/${id}`);
+            return data.data;
+        }
+
         let ticket: SupportTicket | null = null;
 
         // Local'den oku
@@ -315,13 +346,28 @@ export const supportTicketService = {
     },
 
     /**
-     * Mesaj gönder: local kaydet, online ise push dene
+     * Mesaj gönder: local kaydet, online ise push dene.
+     * Web mode (db = null): doğrudan API'ye gönder.
      */
     async addMessage(ticketId: string, body: string): Promise<SupportTicketMessage> {
         const db = await getReadyDb();
-        const msgId = crypto.randomUUID();
         const now = new Date().toISOString();
         const userId = getUserId();
+
+        // Web mode (DathaManager): SQLite yok, doğrudan API'ye gönder
+        if (!db) {
+            if (!isOnline()) {
+                const msgId = crypto.randomUUID();
+                return { id: msgId, senderType: 'USER', senderId: userId, body, createdAt: now };
+            }
+            const { data } = await api.post<ApiResponse<SupportTicketMessage>>(
+                `/support-tickets/${ticketId}/message`,
+                { body },
+            );
+            return data.data;
+        }
+
+        const msgId = crypto.randomUUID();
 
         // Local ticket ID'yi bul
         let localTicketId = ticketId;
