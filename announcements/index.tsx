@@ -156,31 +156,52 @@ const Announcements: React.FC<AnnouncementsProps> = ({ currentUserFullName }) =>
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#F3F4F6] antialiased" style={{ fontFamily: "'Lexend', sans-serif" }}>
 
-            {/* Card Header */}
-            <div className="px-4 lg:px-6 mt-4 lg:mt-5 shrink-0 z-50">
-                <header className="h-16 lg:h-20 bg-white/95 backdrop-blur-md rounded-3xl border border-white/50 flex items-center justify-between px-5 lg:px-8 gap-4 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.05)]">
-                    <div className="flex items-center gap-4 min-w-0">
-                        <div className="leading-none flex flex-col justify-center">
-                            <h1 className="text-xl lg:text-2xl font-extrabold text-[#1F2937] uppercase tracking-tighter mb-1.5">DUYURULAR VE YOL HARİTASI</h1>
-                            <div className="flex items-center gap-2">
-                                <span className="w-2.5 h-2.5 rounded-full bg-[#663259] shadow-[0_0_8px_rgba(102,50,89,0.5)]"></span>
-                                <p className="text-[11px] font-bold text-[#663259] uppercase tracking-widest">GELİŞMELERİ TAKİP EDİN</p>
+            {/* Gradient Header */}
+            <div className="px-4 lg:px-6 mt-4 lg:mt-5 shrink-0">
+                <div
+                    className="relative overflow-hidden rounded-2xl shadow-lg"
+                    style={{ background: 'linear-gradient(135deg, #663259 0%, #4A235A 55%, #3d1d4b 100%)' }}
+                >
+                    {/* Dekoratif arka plan dairesi */}
+                    <div
+                        className="absolute -top-10 -right-10 w-44 h-44 rounded-full opacity-10"
+                        style={{ background: 'radial-gradient(circle, #fff 0%, transparent 70%)' }}
+                    />
+
+                    <div className="relative px-5 lg:px-6 py-4 flex items-center justify-between gap-4">
+                        {/* Sol: İkon + Başlık + İstatistik */}
+                        <div className="flex items-center gap-3.5 min-w-0">
+                            <div className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center border border-white/20 shrink-0">
+                                <span className="material-symbols-outlined text-white text-[24px]">campaign</span>
+                            </div>
+                            <div className="min-w-0">
+                                <h1 className="text-base lg:text-lg font-bold text-white leading-tight truncate">
+                                    Duyurular ve Yol Haritası
+                                </h1>
+                                <p className="text-white/55 text-xs mt-0.5">
+                                    {displayAnnouncements.length > 0 || displayRoadmap.length > 0 || displayRequests.length > 0
+                                        ? [
+                                            displayAnnouncements.length > 0 && `${displayAnnouncements.length} duyuru`,
+                                            displayRoadmap.length > 0 && `${displayRoadmap.length} yol haritası`,
+                                            displayRequests.length > 0 && `${displayRequests.length} talep`,
+                                          ].filter(Boolean).join(' · ')
+                                        : 'Gelişmeleri takip edin'}
+                                </p>
                             </div>
                         </div>
-                    </div>
 
-                    <div className="hidden sm:block h-10 w-px bg-gray-100 mx-1"></div>
-
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={() => navigate('/support')}
-                            className="flex items-center gap-2 h-14 px-7 rounded-xl bg-yellow-400/15 backdrop-blur-sm border border-yellow-400/30 text-yellow-700 hover:bg-yellow-400/25 shadow-sm hover:shadow-md transition-all font-bold text-base shrink-0"
-                        >
-                            <span className="material-symbols-outlined text-[22px]">support_agent</span>
-                            Destek
-                        </button>
+                        {/* Sağ: Destek butonu */}
+                        <div className="flex items-center gap-2 shrink-0">
+                            <button
+                                onClick={() => navigate('/support')}
+                                className="flex items-center gap-1.5 h-9 px-4 rounded-xl bg-white/15 border border-white/20 text-white hover:bg-white/25 transition-all font-medium text-sm"
+                            >
+                                <span className="material-symbols-outlined text-[18px]">support_agent</span>
+                                <span className="hidden sm:inline">Destek</span>
+                            </button>
+                        </div>
                     </div>
-                </header>
+                </div>
             </div>
 
             <div className="flex-1 overflow-hidden px-4 lg:px-6 pb-5 pt-4 flex flex-col">
