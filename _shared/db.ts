@@ -20,3 +20,6 @@ export const getReadyDb = async (): Promise<import('@tauri-apps/plugin-sql').def
         return null;
     }
 };
+
+// Alias for backward compatibility — finance module services use getDb
+export const getDb = getReadyDb;
