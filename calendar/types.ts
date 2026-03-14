@@ -2,10 +2,16 @@ export interface CalendarEvent {
     id: string;
     date: string;
     title: string;
-    type: 'reservation' | 'shift' | 'special';
+    type: 'reservation' | 'shift' | 'special' | 'social_media' | 'sms' | 'whatsapp';
     color: string;
     time?: string;
+    endTime?: string;
     details?: string;
+    peopleCount?: number;
+    table?: string;
+    smPlatform?: string;
+    smContentType?: string;
+    description?: string;
 }
 
 export interface Reservation {

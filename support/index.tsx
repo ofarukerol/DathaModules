@@ -721,11 +721,11 @@ const Support: React.FC = () => {
     };
 
     return (
-        <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#F3F4F6]">
-            <div className="flex-1 overflow-hidden p-5 pt-4 flex flex-col gap-4">
+        <div className="flex-1 flex flex-col bg-[#F3F4F6]">
+            <div className="flex-1 p-5 pt-3 flex flex-col gap-4">
 
-                {/* ─── Scrollable Content ─── */}
-                <div className="shrink-0 overflow-y-auto -mr-2 pr-2 flex flex-col gap-6 max-h-[45%]">
+                {/* ─── Top Section ─── */}
+                <div className="shrink-0 flex flex-col gap-6">
 
                     {/* Search Hero */}
                     <div className="w-full rounded-2xl p-8 relative overflow-hidden text-center shadow-lg"
@@ -739,22 +739,22 @@ const Support: React.FC = () => {
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full pl-12 pr-24 py-4 rounded-xl border-0 focus:ring-4 focus:ring-[#F97171]/30 text-gray-800 placeholder-gray-400 shadow-xl text-lg transition-all outline-none"
+                                    className="w-full pl-12 pr-24 py-4 rounded-xl border-0 focus:ring-4 focus:ring-white/30 text-gray-800 placeholder-gray-400 shadow-xl text-lg transition-all outline-none"
                                     placeholder="Bir konu arayın (örn: Fatura, Kurulum, API)..."
                                 />
-                                <span className="material-symbols-outlined absolute left-4 top-4 text-gray-400 text-[28px] group-focus-within:text-[#F97171] transition-colors">search</span>
-                                <button className="absolute right-3 top-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-1.5 rounded-lg text-sm font-bold transition-colors">
+                                <span className="material-symbols-outlined absolute left-4 top-4 text-gray-400 text-[28px] group-focus-within:text-[#663259] transition-colors">search</span>
+                                <button className="absolute right-3 top-2.5 bg-white/90 hover:bg-white text-[#663259] hover:text-[#4A235A] px-4 py-1.5 rounded-lg text-sm font-bold transition-colors shadow-sm">
                                     Ara
                                 </button>
                             </div>
                         </div>
-                        <div className="flex items-center justify-center gap-3 mt-4 text-white/70 text-sm relative z-10">
-                            <span>Popüler:</span>
-                            <button onClick={() => setSearchQuery('Şifremi unuttum')} className="hover:text-white hover:underline transition-colors">Şifremi unuttum</button>
-                            <span className="w-1 h-1 bg-white/40 rounded-full" />
-                            <button onClick={() => setSearchQuery('Fatura')} className="hover:text-white hover:underline transition-colors">Fatura görüntüleme</button>
-                            <span className="w-1 h-1 bg-white/40 rounded-full" />
-                            <button onClick={() => setSearchQuery('Sipariş iptali')} className="hover:text-white hover:underline transition-colors">Sipariş iptali</button>
+                        <div className="flex items-center justify-center gap-3 mt-4 text-white/60 text-sm relative z-10">
+                            <span className="font-medium">Popüler:</span>
+                            <button onClick={() => setSearchQuery('Şifremi unuttum')} className="text-white/80 hover:text-white hover:underline underline-offset-2 transition-colors">Şifremi unuttum</button>
+                            <span className="w-1 h-1 bg-white/30 rounded-full" />
+                            <button onClick={() => setSearchQuery('Fatura')} className="text-white/80 hover:text-white hover:underline underline-offset-2 transition-colors">Fatura görüntüleme</button>
+                            <span className="w-1 h-1 bg-white/30 rounded-full" />
+                            <button onClick={() => setSearchQuery('Sipariş iptali')} className="text-white/80 hover:text-white hover:underline underline-offset-2 transition-colors">Sipariş iptali</button>
                         </div>
                     </div>
 
@@ -797,7 +797,7 @@ const Support: React.FC = () => {
                 </div>
 
                 {/* ─── İki Kolonlu Alan: Talepler + Canlı Destek (sidebar hizalı) ─── */}
-                <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-5 flex-1 min-h-0">
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-5 min-h-[520px]">
 
                         {/* Sol Kolon — Destek Geçmişi (talepler + sohbetler) */}
                         <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 overflow-hidden flex flex-col">

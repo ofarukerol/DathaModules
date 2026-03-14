@@ -1,11 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useFavoritesStore, CALENDAR_PAGE_INFO } from './store';
+import { useFavoritesStore, CALENDAR_PAGE_INFO, useCalendarStore } from './store';
 import CustomSelect from './components/CustomSelect';
 import DatePicker from './components/DatePicker';
 import RichTextEditor from './components/RichTextEditor';
 import { useEscapeKey } from '../_shared/useEscapeKey';
-import type { CalendarEvent, Reservation, StaffMember, EventFormState } from './types';
+import type { StaffMember, EventFormState } from './types';
 
 // Helper functions
 function toDateKey(date: Date): string {
@@ -44,30 +44,6 @@ function getWeekDays(date: Date): Date[] {
 const TURKISH_MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 const TURKISH_DAYS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
 const TURKISH_DAY_NAMES = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
-
-// Sample data
-const sampleEvents: CalendarEvent[] = [
-    { id: '1', date: '2023-10-02', title: '09:00 Vardiya', type: 'shift', color: '#8E44AD' },
-    { id: '2', date: '2023-10-03', title: '20:30 Rezv (4)', type: 'reservation', color: '#F97171', time: '20:30' },
-    { id: '3', date: '2023-10-05', title: '09:00 Vardiya', type: 'shift', color: '#8E44AD' },
-    { id: '4', date: '2023-10-05', title: '14:00 Tedarik', type: 'special', color: '#3B82F6' },
-    { id: '5', date: '2023-10-06', title: 'Özel Etkinlik', type: 'special', color: '#10B981' },
-    { id: '6', date: '2023-10-09', title: '19:00 Rezv (2)', type: 'reservation', color: '#F97171', time: '19:00' },
-    { id: '7', date: '2023-10-11', title: '09:00 Vardiya', type: 'shift', color: '#8E44AD' },
-    { id: '8', date: '2023-10-13', title: '21:00 Rezv (8)', type: 'reservation', color: '#F97171', time: '21:00' },
-    { id: '9', date: '2023-10-19', title: '11:00 Vardiya', type: 'shift', color: '#8E44AD' },
-    { id: '10', date: '2023-10-20', title: '18:30 Rezv (6)', type: 'reservation', color: '#F97171', time: '18:30' },
-    { id: '11', date: '2023-10-24', title: '20:30 Rezv (4) - Masa 5', type: 'reservation', color: '#F97171', time: '20:30', details: '4 Kişi • Masa 5 (Teras)' },
-    { id: '12', date: '2023-10-24', title: '16:00 A. Yılmaz - Şef', type: 'shift', color: '#8E44AD' },
-    { id: '13', date: '2023-10-26', title: '09:00 Vardiya', type: 'shift', color: '#8E44AD' },
-    { id: '14', date: '2023-10-29', title: 'Cumhuriyet B.', type: 'special', color: '#10B981' },
-    { id: '15', date: '2023-10-31', title: 'Cadılar Bayramı', type: 'special', color: '#F97171' },
-];
-
-const sampleReservations: Reservation[] = [
-    { id: '1', time: '20:30', name: 'Ahmet Yılmaz', people: 4, table: 'Masa 5 (Teras)', status: 'confirmed' },
-    { id: '2', time: '21:00', name: 'Ayşe Demir', people: 2, table: 'Masa 12', status: 'waiting' },
-];
 
 const sampleStaff: StaffMember[] = [
     {
@@ -173,9 +149,10 @@ const Calendar: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { toggleFavorite, isFavorite } = useFavoritesStore();
+    const { events, addEvent } = useCalendarStore();
     const isFav = isFavorite(location.pathname);
 
-    const [currentDate, setCurrentDate] = useState(new Date(2023, 9, 24)); // October 24, 2023
+    const [currentDate, setCurrentDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
     const [showEventModal, setShowEventModal] = useState(false);
     const [eventForm, setEventForm] = useState<EventFormState>(DEFAULT_FORM);
@@ -197,7 +174,7 @@ const Calendar: React.FC = () => {
 
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
-    const today = new Date(2023, 9, 24); // Fixed to Oct 24, 2023 for demo
+    const today = new Date();
     const todayKey = toDateKey(today);
 
     const monthGridDays = useMemo(() => getMonthGridDays(year, month), [year, month]);
@@ -210,7 +187,7 @@ const Calendar: React.FC = () => {
     };
 
     const getEventsForDay = (dateStr: string) => {
-        return sampleEvents.filter(e => e.date === dateStr);
+        return events.filter(e => e.date === dateStr);
     };
 
     const getEventColor = (type: string) => {
@@ -227,10 +204,29 @@ const Calendar: React.FC = () => {
     };
 
     const handleAddEvent = () => {
-        if (eventForm.title.trim()) {
-            resetEventForm();
-            setShowEventModal(false);
-        }
+        if (!eventForm.title.trim()) return;
+
+        const newEvent = {
+            id: crypto.randomUUID(),
+            date: eventForm.date || todayKey,
+            title: eventForm.title.trim(),
+            type: eventForm.type as 'reservation' | 'shift' | 'special' | 'social_media' | 'sms' | 'whatsapp',
+            color: eventForm.color,
+            time: eventForm.startTime || undefined,
+            endTime: eventForm.endTime || undefined,
+            details: eventForm.type === 'reservation' && eventForm.peopleCount
+                ? `${eventForm.peopleCount} Kişi${eventForm.table ? ' • ' + TABLE_OPTIONS.find(t => t.value === eventForm.table)?.label : ''}`
+                : undefined,
+            peopleCount: eventForm.peopleCount ? Number(eventForm.peopleCount) : undefined,
+            table: eventForm.table || undefined,
+            smPlatform: eventForm.smPlatform || undefined,
+            smContentType: eventForm.smContentType || undefined,
+            description: eventForm.description || undefined,
+        };
+
+        addEvent(newEvent);
+        resetEventForm();
+        setShowEventModal(false);
     };
 
     return (
@@ -475,59 +471,62 @@ const Calendar: React.FC = () => {
                             <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-8 -mt-8 blur-2xl group-hover:bg-white/15 transition-all"></div>
                             <div className="absolute bottom-0 left-0 w-24 h-24 bg-[#F97171]/30 rounded-full -ml-8 -mb-8 blur-xl group-hover:bg-[#F97171]/40 transition-all"></div>
                             <div className="relative z-10">
-                                <h3 className="text-3xl font-bold mb-1 text-white">24 Ekim</h3>
-                                <p className="text-white/70 mb-6 font-medium">Salı, 2023</p>
+                                <h3 className="text-3xl font-bold mb-1 text-white">{today.getDate()} {TURKISH_MONTHS[today.getMonth()]}</h3>
+                                <p className="text-white/70 mb-6 font-medium">{TURKISH_DAY_NAMES[(today.getDay() + 6) % 7]}, {today.getFullYear()}</p>
                                 <div className="flex gap-4">
                                     <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 flex-1 border border-white/10 hover:bg-white/15 transition-all">
-                                        <p className="text-xs text-white/70 mb-2 font-medium">Rezervasyon</p>
-                                        <p className="text-3xl font-bold text-white">12</p>
+                                        <p className="text-xs text-white/70 mb-2 font-medium">Etkinlik</p>
+                                        <p className="text-3xl font-bold text-white">{getEventsForDay(todayKey).length}</p>
                                     </div>
                                     <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 flex-1 border border-white/10 hover:bg-white/15 transition-all">
-                                        <p className="text-xs text-white/70 mb-2 font-medium">Personel</p>
-                                        <p className="text-3xl font-bold text-white">8</p>
+                                        <p className="text-xs text-white/70 mb-2 font-medium">Rezervasyon</p>
+                                        <p className="text-3xl font-bold text-white">{getEventsForDay(todayKey).filter(e => e.type === 'reservation').length}</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* Upcoming Reservations */}
-                        <div className="flex flex-col gap-4">
-                            <h4 className="font-bold text-[#1F2937] text-sm uppercase tracking-wider pl-1">
-                                Yaklaşan Rezervasyonlar
-                            </h4>
-                            <div className="space-y-3">
-                            {sampleReservations.map((reservation) => (
-                                <div
-                                    key={reservation.id}
-                                    className="bg-white rounded-xl border border-gray-100 p-4 flex gap-4 items-start group hover:border-[#F97171]/50 hover:shadow-md transition-all cursor-pointer shadow-sm"
-                                >
-                                    <div className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center shrink-0 border ${
-                                        reservation.status === 'confirmed'
-                                            ? 'bg-orange-50 text-orange-500 border-orange-100'
-                                            : 'bg-gray-50 text-gray-500 border-gray-100'
-                                    }`}>
-                                        <span className="text-xs font-bold">{reservation.time}</span>
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="flex justify-between items-start mb-1">
-                                            <h5 className="font-bold text-[#1F2937] text-sm">{reservation.name}</h5>
-                                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                                                reservation.status === 'confirmed'
-                                                    ? 'bg-green-100 text-green-700'
-                                                    : 'bg-yellow-100 text-yellow-700'
-                                            }`}>
-                                                {reservation.status === 'confirmed' ? 'Onaylı' : 'Bekliyor'}
-                                            </span>
-                                        </div>
-                                        <p className="text-xs text-gray-500 flex items-center gap-1">
-                                            <span className="material-symbols-outlined text-[14px]">group</span>
-                                            {reservation.people} Kişi • {reservation.table}
-                                        </p>
+                        {(() => {
+                            const upcomingReservations = events
+                                .filter(e => e.type === 'reservation' && e.date >= todayKey)
+                                .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))
+                                .slice(0, 5);
+                            return upcomingReservations.length > 0 ? (
+                                <div className="flex flex-col gap-4">
+                                    <h4 className="font-bold text-[#1F2937] text-sm uppercase tracking-wider pl-1">
+                                        Yaklaşan Rezervasyonlar
+                                    </h4>
+                                    <div className="space-y-3">
+                                        {upcomingReservations.map((event) => (
+                                            <div
+                                                key={event.id}
+                                                className="bg-white rounded-xl border border-gray-100 p-4 flex gap-4 items-start group hover:border-[#F97171]/50 hover:shadow-md transition-all cursor-pointer shadow-sm"
+                                            >
+                                                <div className="w-12 h-12 rounded-xl flex flex-col items-center justify-center shrink-0 border bg-orange-50 text-orange-500 border-orange-100">
+                                                    <span className="text-[10px] font-bold">{event.time || '--:--'}</span>
+                                                    <span className="text-[9px] text-orange-400 mt-0.5">{event.date.slice(5).replace('-', '/')}</span>
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="flex justify-between items-start mb-1">
+                                                        <h5 className="font-bold text-[#1F2937] text-sm">{event.title}</h5>
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-green-100 text-green-700">
+                                                            Onaylı
+                                                        </span>
+                                                    </div>
+                                                    {event.details && (
+                                                        <p className="text-xs text-gray-500 flex items-center gap-1">
+                                                            <span className="material-symbols-outlined text-[14px]">group</span>
+                                                            {event.details}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
-                            ))}
-                            </div>
-                        </div>
+                            ) : null;
+                        })()}
 
                         {/* Staff on Shift */}
                         <div className="flex flex-col gap-4">
