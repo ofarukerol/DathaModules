@@ -416,21 +416,8 @@ export const getIlceler = (il: string): string[] => ILCELER[il] || [];
 
 export const getMahalleler = (ilce: string): string[] => MAHALLELER[ilce] || [];
 
-/** İlçeye göre mahalleleri SQLite'dan çeker, yoksa statik veriye fallback yapar */
+/** İlçeye göre mahalleleri statik veriden döndürür (web mod — SQLite yok) */
 export const getMahallelerAsync = async (ilce: string): Promise<string[]> => {
-    try {
-        const { getReadyDb } = await import('../../../services/db');
-        const db = await getReadyDb();
-        if (db) {
-            const rows = await db.select<{ mahalle: string }[]>(
-                'SELECT mahalle FROM mahalleler WHERE ilce = $1 ORDER BY mahalle COLLATE NOCASE',
-                [ilce]
-            );
-            if (rows.length > 0) return rows.map(r => r.mahalle);
-        }
-    } catch {
-        /* DB unavailable — fallback */
-    }
     return MAHALLELER[ilce] || [];
 };
 
