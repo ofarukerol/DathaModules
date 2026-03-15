@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Trash2 } from 'lucide-react';
 import { useInvoiceStore } from '../stores/useInvoiceStore';
@@ -8,7 +8,7 @@ import { Invoice, InvoiceWithItems } from '../services/invoiceService';
 import CustomSelect from '../../../components/CustomSelect';
 import DatePicker from '../../../components/DatePicker';
 import { useEscapeKey } from '../../_shared/useEscapeKey';
-import HeaderActions from '../../../components/HeaderActions';
+import PageToolbar from '../../../components/PageToolbar';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -440,36 +440,18 @@ const Invoices: React.FC = () => {
         <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-gray-50">
             <div className="flex-1 overflow-hidden p-5 pt-4 flex flex-col gap-4">
 
-                {/* Gradient Header */}
-                <div
-                    className="relative overflow-hidden rounded-2xl shadow-lg shrink-0"
-                    style={{ background: 'linear-gradient(135deg, #663259 0%, #4A235A 55%, #3d1d4b 100%)' }}
-                >
-                    <div className="absolute -top-10 -right-10 w-44 h-44 rounded-full opacity-10"
-                        style={{ background: 'radial-gradient(circle, #fff 0%, transparent 70%)' }} />
-                    <div className="relative px-6 py-5 flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                            <div className="flex items-center">
-                                <button onClick={() => navigate(-1)} className="h-12 px-2.5 rounded-l-xl bg-white/10 flex items-center justify-center hover:bg-white/20 active:scale-95 transition-all border border-white/15 border-r-0">
-                                    <span className="material-symbols-outlined text-white/70 text-[20px]">arrow_back</span>
-                                </button>
-                                <div className="w-12 h-12 rounded-r-xl bg-white/15 flex items-center justify-center border border-white/20 border-l-white/10">
-                                    <span className="material-symbols-outlined text-white text-[26px]">receipt_long</span>
-                                </div>
-                            </div>
-                            <div>
-                                <h1 className="text-xl font-bold text-white leading-tight">Faturalar</h1>
-                                <p className="text-white/60 text-xs mt-0.5">Fatura yönetim paneli</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 shrink-0">
-                            {/* Tabs */}
-                            <div className="flex items-center bg-white/10 p-1 rounded-xl gap-1 border border-white/15">
+                <PageToolbar
+                    icon="receipt_long"
+                    title="Faturalar"
+                    stats="Fatura yönetim paneli"
+                    actions={
+                        <>
+                            <div className="flex items-center bg-gray-100 p-1 rounded-lg gap-1">
                                 <button
                                     onClick={() => setActiveTab('purchase')}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'purchase'
-                                        ? 'bg-white/20 text-white'
-                                        : 'text-white/50 hover:text-white/80'
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${activeTab === 'purchase'
+                                        ? 'bg-white text-[#663259] shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-700'
                                         }`}
                                 >
                                     <span className="material-symbols-outlined text-[16px]">call_received</span>
@@ -477,9 +459,9 @@ const Invoices: React.FC = () => {
                                 </button>
                                 <button
                                     onClick={() => setActiveTab('sale')}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'sale'
-                                        ? 'bg-white/20 text-white'
-                                        : 'text-white/50 hover:text-white/80'
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${activeTab === 'sale'
+                                        ? 'bg-white text-[#663259] shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-700'
                                         }`}
                                 >
                                     <span className="material-symbols-outlined text-[16px]">call_made</span>
@@ -488,15 +470,15 @@ const Invoices: React.FC = () => {
                             </div>
                             <button
                                 onClick={() => setShowCompanyModal(true)}
-                                className="flex items-center gap-2 px-4 py-2.5 bg-white/15 text-white rounded-xl text-sm font-bold hover:bg-white/25 border border-white/20 transition-all"
+                                className="h-8 flex items-center gap-1.5 px-3.5 rounded-lg text-sm font-semibold text-white transition-all hover:brightness-110"
+                                style={{ background: '#663259' }}
                             >
-                                <span className="material-symbols-outlined text-[18px]">add</span>
+                                <span className="material-symbols-outlined text-[17px]">add</span>
                                 Yeni Fatura
                             </button>
-                            <HeaderActions />
-                        </div>
-                    </div>
-                </div>
+                        </>
+                    }
+                />
                 {/* Scrollable Content */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4">
                     {/* Summary Cards */}

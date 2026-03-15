@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import GradientHeader from '../../../components/GradientHeader';
+import PageToolbar from '../../../components/PageToolbar';
 import { useCheckStore } from '../stores/useCheckStore';
 import { useCompanyStore } from '../../../stores/useCompanyStore';
 import {
@@ -414,19 +414,21 @@ const Checks: React.FC = () => {
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-gray-50">
             <div className="flex-1 overflow-hidden p-5 pt-4 flex flex-col gap-4">
-                <GradientHeader
+                <PageToolbar
                     icon="receipt_long"
                     title="Çek / Senet"
-                    subtitle="Alınan ve verilen çek/senet takibi ve vade yönetimi"
-                >
-                    <button
-                        onClick={() => setShowAddModal(true)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-white/15 text-white rounded-xl text-sm font-bold hover:bg-white/25 border border-white/20 transition-all"
-                    >
-                        <span className="material-symbols-outlined text-[18px]">add</span>
-                        Yeni Ekle
-                    </button>
-                </GradientHeader>
+                    stats="Alınan ve verilen çek/senet takibi ve vade yönetimi"
+                    actions={
+                        <button
+                            onClick={() => setShowAddModal(true)}
+                            className="h-8 flex items-center gap-1.5 px-3.5 rounded-lg text-sm font-semibold text-white transition-all hover:brightness-110"
+                            style={{ background: '#663259' }}
+                        >
+                            <span className="material-symbols-outlined text-[17px]">add</span>
+                            Yeni Ekle
+                        </button>
+                    }
+                />
 
                 {/* Stats */}
                 <div className="grid grid-cols-4 gap-4 shrink-0">

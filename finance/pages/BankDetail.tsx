@@ -10,7 +10,7 @@ import { useBankAccountStore } from '../stores/useBankAccountStore';
 import { useBankTransactionStore } from '../stores/useBankTransactionStore';
 import { BankTransaction } from '../services/bankTransactionService';
 import { useFinanceStore } from '../../../stores/useFinanceStore';
-import HeaderActions from '../../../components/HeaderActions';
+import PageToolbar from '../../../components/PageToolbar';
 import EInvoiceIntegrationModal from '../components/EInvoiceIntegrationModal';
 import * as XLSX from 'xlsx';
 
@@ -121,63 +121,44 @@ const BankDetail: React.FC = () => {
 
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-gray-50">
-            <div className="p-5 pt-4 pb-0 shrink-0">
-                {/* Gradient Header */}
-                <div
-                    className="relative overflow-hidden rounded-2xl shadow-lg"
-                    style={{ background: 'linear-gradient(135deg, #663259 0%, #4A235A 55%, #3d1d4b 100%)' }}
-                >
-                    <div className="absolute -top-10 -right-10 w-44 h-44 rounded-full opacity-10"
-                        style={{ background: 'radial-gradient(circle, #fff 0%, transparent 70%)' }} />
-                    <div className="relative px-6 py-5 flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                            <div className="flex items-center">
-                                <button onClick={() => navigate(-1)} className="h-12 px-2.5 rounded-l-xl bg-white/10 flex items-center justify-center hover:bg-white/20 active:scale-95 transition-all border border-white/15 border-r-0">
-                                    <span className="material-symbols-outlined text-white/70 text-[20px]">arrow_back</span>
-                                </button>
-                                <div className="w-12 h-12 rounded-r-xl flex items-center justify-center text-white font-bold text-xs shrink-0 border border-white/20 border-l-white/10" style={{ backgroundColor: account.color }}>
-                                    {account.code}
-                                </div>
-                            </div>
-                            <div>
-                                <h1 className="text-xl font-bold text-white leading-tight">{account.name}</h1>
-                                <p className="text-white/60 text-xs mt-0.5">{account.iban || 'IBAN girilmemiş'}</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 shrink-0">
-                            <button
-                                onClick={() => setShowIntegrationModal(true)}
-                                className="flex items-center gap-2 px-4 py-2.5 bg-white/15 text-white rounded-xl hover:bg-white/25 transition-all font-bold text-sm border border-white/20"
-                            >
-                                <span className="material-symbols-outlined text-[18px]">integration_instructions</span>
-                                Entegrasyon
-                            </button>
-                            <button
-                                onClick={() => setShowImportModal(true)}
-                                className="flex items-center gap-2 px-4 py-2.5 bg-white/10 text-white/90 rounded-xl hover:bg-white/20 transition-all font-bold text-sm border border-white/15"
-                            >
-                                <span className="material-symbols-outlined text-[18px]">upload_file</span>
-                                Excel Aktar
-                            </button>
-                            <button
-                                onClick={handleAddTransaction}
-                                className="flex items-center gap-2 px-4 py-2.5 bg-white/15 text-white rounded-xl hover:bg-white/25 transition-all font-bold text-sm border border-white/20"
-                            >
-                                <Plus size={18} />
-                                Hareket Ekle
-                            </button>
-                            <button
-                                onClick={handleExportExcel}
-                                className="flex items-center gap-2 px-4 py-2.5 bg-white/10 text-white/70 rounded-xl hover:bg-white/20 transition-all font-bold text-sm border border-white/15"
-                            >
-                                <Download size={16} />
-                                Excel
-                            </button>
-                            <HeaderActions />
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <PageToolbar
+                icon="account_balance"
+                title={account.name}
+                stats={account.iban || 'IBAN girilmemiş'}
+                actions={
+                    <>
+                        <button
+                            onClick={() => setShowIntegrationModal(true)}
+                            className="h-8 flex items-center gap-1.5 px-3 rounded-lg text-sm font-semibold text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition-all"
+                        >
+                            <span className="material-symbols-outlined text-[17px]">integration_instructions</span>
+                            Entegrasyon
+                        </button>
+                        <button
+                            onClick={() => setShowImportModal(true)}
+                            className="h-8 flex items-center gap-1.5 px-3 rounded-lg text-sm font-semibold text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition-all"
+                        >
+                            <span className="material-symbols-outlined text-[17px]">upload_file</span>
+                            Excel Aktar
+                        </button>
+                        <button
+                            onClick={handleAddTransaction}
+                            className="h-8 flex items-center gap-1.5 px-3.5 rounded-lg text-sm font-semibold text-white transition-all hover:brightness-110"
+                            style={{ background: '#663259' }}
+                        >
+                            <Plus size={16} />
+                            Hareket Ekle
+                        </button>
+                        <button
+                            onClick={handleExportExcel}
+                            className="h-8 flex items-center gap-1.5 px-3 rounded-lg text-sm font-semibold text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition-all"
+                        >
+                            <Download size={14} />
+                            Excel
+                        </button>
+                    </>
+                }
+            />
 
             <div className="flex-1 overflow-hidden flex gap-6 px-5 py-4">
                 {/* Left Sidebar */}

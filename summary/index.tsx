@@ -66,7 +66,7 @@ export default function SummaryContent(props: SummaryContentProps) {
                 {/* Stats Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
                     {/* Toplam Satış */}
-                    <div className="bg-white p-5 rounded-2xl flex flex-col justify-between relative overflow-hidden shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] group hover:-translate-y-1 transition-transform duration-300 border border-gray-100">
+                    <div className="bg-white p-5 rounded-2xl flex flex-col justify-between relative overflow-hidden shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] border border-gray-100">
                         <div className="absolute top-4 right-4 p-2 bg-[#10B981]/10 rounded-lg">
                             <span className="material-symbols-outlined text-2xl text-[#10B981]">payments</span>
                         </div>

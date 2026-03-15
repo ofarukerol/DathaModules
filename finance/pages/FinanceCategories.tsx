@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Plus, X, Trash2, Pencil, Check, Shield } from 'lucide-react';
 import { useFinanceCategoryStore, FinanceCategory } from '../stores/useFinanceCategoryStore';
-import HeaderActions from '../../../components/HeaderActions';
+import PageToolbar from '../../../components/PageToolbar';
 
 const availableIcons = [
     'groups', 'home', 'bolt', 'inventory_2', 'gavel', 'cleaning_services',
@@ -16,7 +15,6 @@ const availableIcons = [
 ];
 
 const FinanceCategories: React.FC = () => {
-    const navigate = useNavigate();
     const { addCategory, updateCategory, deleteCategory, getCategoriesByType } = useFinanceCategoryStore();
 
     const [showModal, setShowModal] = useState(false);
@@ -95,33 +93,11 @@ const FinanceCategories: React.FC = () => {
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-gray-50">
             <div className="flex-1 overflow-hidden p-5 pt-4 flex flex-col gap-4">
-                {/* Gradient Header */}
-                <div
-                    className="relative overflow-hidden rounded-2xl shadow-lg shrink-0"
-                    style={{ background: 'linear-gradient(135deg, #663259 0%, #4A235A 55%, #3d1d4b 100%)' }}
-                >
-                    <div className="absolute -top-10 -right-10 w-44 h-44 rounded-full opacity-10"
-                        style={{ background: 'radial-gradient(circle, #fff 0%, transparent 70%)' }} />
-                    <div className="relative px-6 py-5 flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                            <div className="flex items-center">
-                                <button onClick={() => navigate(-1)} className="h-12 px-2.5 rounded-l-xl bg-white/10 flex items-center justify-center hover:bg-white/20 active:scale-95 transition-all border border-white/15 border-r-0">
-                                    <span className="material-symbols-outlined text-white/70 text-[20px]">arrow_back</span>
-                                </button>
-                                <div className="w-12 h-12 rounded-r-xl bg-white/15 flex items-center justify-center border border-white/20 border-l-white/10">
-                                    <span className="material-symbols-outlined text-white text-[26px]">category</span>
-                                </div>
-                            </div>
-                            <div>
-                                <h1 className="text-xl font-bold text-white leading-tight">Gelir & Gider Kategorileri</h1>
-                                <p className="text-white/60 text-xs mt-0.5">Kategori ekleme, düzenleme ve silme</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 shrink-0">
-                            <HeaderActions />
-                        </div>
-                    </div>
-                </div>
+                <PageToolbar
+                    icon="category"
+                    title="Gelir & Gider Kategorileri"
+                    stats={`${expenseCategories.length} gider · ${incomeCategories.length} gelir kategorisi`}
+                />
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
