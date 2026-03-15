@@ -162,48 +162,48 @@ export default function SummaryContent(props: SummaryContentProps) {
                 {/* Üst Bölüm: Canlı Ciro ve Görevlerim */}
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                     {/* Canlı Ciro */}
-                    <div className="bg-white rounded-2xl p-6 flex flex-col shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] border border-gray-100 min-h-[460px] xl:col-span-2">
+                    <div className="bg-white rounded-2xl p-4 flex flex-col shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] border border-gray-100 min-h-[331px] xl:col-span-2">
                         {/* Başlık + Saat aralığı */}
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-5 gap-3">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-3 gap-2">
                             <div>
-                                <h3 className="text-lg font-bold text-[#1F2937] leading-tight">Canlı Ciro</h3>
-                                <p className="text-xs text-gray-400 leading-tight mt-0.5">Bugün için gerçek zamanlı gelir takibi</p>
+                                <h3 className="text-sm font-bold text-[#1F2937] leading-tight">Canlı Ciro</h3>
+                                <p className="text-[11px] text-gray-400 leading-tight mt-0.5">Bugün için gerçek zamanlı gelir takibi</p>
                             </div>
                             {/* Açılış-kapanış saati */}
-                            <div className="flex items-center gap-2 shrink-0 bg-gray-50 border border-gray-100 rounded-xl px-3.5 py-2">
-                                <span className="material-symbols-outlined text-[16px] text-gray-400">schedule</span>
-                                <span className="text-xs font-semibold text-gray-500">{storeOpenTime}</span>
-                                <span className="text-gray-300 text-xs">{'\u2014'}</span>
-                                <span className="text-xs font-semibold text-gray-500">{storeCloseTime}</span>
+                            <div className="flex items-center gap-1.5 shrink-0 bg-gray-50 border border-gray-100 rounded-lg px-2.5 py-1">
+                                <span className="material-symbols-outlined text-[13px] text-gray-400">schedule</span>
+                                <span className="text-[11px] font-semibold text-gray-500">{storeOpenTime}</span>
+                                <span className="text-gray-300 text-[11px]">{'\u2014'}</span>
+                                <span className="text-[11px] font-semibold text-gray-500">{storeCloseTime}</span>
                                 <span className="ml-1 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                             </div>
                         </div>
 
                         {/* Toplam ciro */}
-                        <div className="mb-5 flex items-baseline gap-3">
-                            <span className="text-4xl font-bold tracking-tight text-[#663259]">
+                        <div className="mb-3 flex items-baseline gap-2.5">
+                            <span className="text-2xl font-bold tracking-tight text-[#663259]">
                                 {'\u20BA'}{todayIncome.toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                             </span>
                             {chartChange !== 0 && (
-                                <span className={`${chartChange >= 0 ? 'text-[#10B981] bg-[#10B981]/10' : 'text-[#F97171] bg-[#F97171]/10'} text-sm font-bold px-2 py-0.5 rounded-lg`}>
+                                <span className={`${chartChange >= 0 ? 'text-[#10B981] bg-[#10B981]/10' : 'text-[#F97171] bg-[#F97171]/10'} text-[11px] font-bold px-1.5 py-0.5 rounded-md`}>
                                     {chartChange >= 0 ? '+' : ''}{chartChange}% dün
                                 </span>
                             )}
                             {todayOrderCount > 0 && (
-                                <span className="text-sm text-gray-400 font-medium">{todayOrderCount} sipariş</span>
+                                <span className="text-[11px] text-gray-400 font-medium">{todayOrderCount} sipariş</span>
                             )}
                         </div>
 
                         {/* SVG Line Chart */}
-                        <div className="relative flex-1 w-full min-h-[220px]">
+                        <div className="relative flex-1 w-full min-h-[158px]">
                             {chartData.length > 0 && chartData.some(d => d.amount > 0) ? (
                                 <HourlyLineChart data={chartData} currentDataIdx={currentDataIdx} />
                             ) : (
                                 <div className="h-full flex items-center justify-center text-gray-300">
                                     <div className="text-center">
-                                        <span className="material-symbols-outlined text-5xl mb-2">show_chart</span>
-                                        <p className="text-sm font-medium">Henüz veri yok</p>
-                                        <p className="text-xs mt-1 text-gray-300">Gün içinde siparişler geldikçe grafik oluşacak</p>
+                                        <span className="material-symbols-outlined text-3xl mb-1">show_chart</span>
+                                        <p className="text-xs font-medium">Henüz veri yok</p>
+                                        <p className="text-[11px] mt-1 text-gray-300">Gün içinde siparişler geldikçe grafik oluşacak</p>
                                     </div>
                                 </div>
                             )}
@@ -211,42 +211,42 @@ export default function SummaryContent(props: SummaryContentProps) {
                     </div>
 
                     {/* Görevlerim */}
-                    <div className="bg-white rounded-2xl p-6 flex flex-col shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] border border-gray-100 h-[460px]">
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 shrink-0 min-h-[56px] gap-4">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#663259]/10 to-[#8E44AD]/10 flex items-center justify-center text-[#663259]">
-                                    <span className="material-symbols-outlined text-[24px]">task_alt</span>
+                    <div className="bg-white rounded-2xl p-4 flex flex-col shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] border border-gray-100 h-[331px]">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-3 shrink-0 min-h-[40px] gap-2">
+                            <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#663259]/10 to-[#8E44AD]/10 flex items-center justify-center text-[#663259]">
+                                    <span className="material-symbols-outlined text-[17px]">task_alt</span>
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-bold text-[#1F2937] leading-tight">Görevlerim</h3>
-                                    <p className="text-xs text-gray-500 leading-tight mt-1">Hızlı görev yönetimi</p>
+                                    <h3 className="text-sm font-bold text-[#1F2937] leading-tight">Görevlerim</h3>
+                                    <p className="text-[11px] text-gray-500 leading-tight">Hızlı görev yönetimi</p>
                                 </div>
                             </div>
                             <button
                                 onClick={onNavigateToTodos}
-                                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#663259] to-[#8E44AD] text-white rounded-xl hover:shadow-lg transition-all text-sm font-bold shrink-0"
+                                className="flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-[#663259] to-[#8E44AD] text-white rounded-lg hover:shadow-lg transition-all text-[11px] font-bold shrink-0"
                             >
-                                <span className="material-symbols-outlined text-[18px]">view_kanban</span>
+                                <span className="material-symbols-outlined text-[14px]">view_kanban</span>
                                 Tüm Görevler
                             </button>
                         </div>
 
                         {/* Hızlı Görev Ekleme */}
-                        <div className="mb-4 flex gap-2">
+                        <div className="mb-2.5 flex gap-1.5">
                             <input
                                 type="text"
                                 value={newTaskTitle}
                                 onChange={(e) => onNewTaskTitleChange(e.target.value)}
                                 onKeyDown={handleKeyDown}
                                 placeholder="Hızlı görev ekle..."
-                                className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#663259] focus:border-transparent transition-all"
+                                className="flex-1 px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#663259] focus:border-transparent transition-all"
                             />
                             <button
                                 onClick={onAddTask}
                                 disabled={!newTaskTitle.trim()}
-                                className="px-5 py-2.5 bg-[#663259] text-white rounded-xl hover:shadow-lg hover:shadow-[#663259]/30 hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none transition-all flex items-center gap-2 font-bold shadow-sm"
+                                className="px-3 py-1.5 bg-[#663259] text-white rounded-lg hover:shadow-lg hover:shadow-[#663259]/30 hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none transition-all flex items-center gap-1 font-bold shadow-sm text-xs"
                             >
-                                <span className="material-symbols-outlined text-[18px]">add</span>
+                                <span className="material-symbols-outlined text-[14px]">add</span>
                                 Ekle
                             </button>
                         </div>
@@ -347,53 +347,51 @@ export default function SummaryContent(props: SummaryContentProps) {
                 {/* Alt Bölüm: Son İşlemler ve Vardiyalı Personeller */}
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                     {/* Son İşlemler */}
-                    <div className="bg-white rounded-2xl p-6 flex flex-col shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] border border-gray-100 h-[420px]">
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 shrink-0 min-h-[56px] gap-4">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center text-green-600">
-                                    <span className="material-symbols-outlined text-[24px]">receipt_long</span>
+                    <div className="bg-white rounded-2xl p-4 flex flex-col shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] border border-gray-100 h-[302px]">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-3 shrink-0 min-h-[40px] gap-2">
+                            <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center text-green-600">
+                                    <span className="material-symbols-outlined text-[17px]">receipt_long</span>
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-bold text-[#1F2937] leading-tight">Son İşlemler</h3>
-                                    <p className="text-xs text-gray-500 leading-tight mt-1">En son yapılan işlemler</p>
+                                    <h3 className="text-sm font-bold text-[#1F2937] leading-tight">Son İşlemler</h3>
+                                    <p className="text-[11px] text-gray-500 leading-tight">En son yapılan işlemler</p>
                                 </div>
                             </div>
-                            <button className="text-xs text-[#F97171] hover:text-[#E05A5A] font-bold bg-[#F97171]/5 px-3 py-1.5 rounded-md transition-colors shrink-0">
+                            <button className="text-[11px] text-[#F97171] hover:text-[#E05A5A] font-bold bg-[#F97171]/5 px-2.5 py-1 rounded-md transition-colors shrink-0">
                                 Tümü
                             </button>
                         </div>
                         <div className="flex-1 overflow-y-auto -mr-3 pr-3 custom-scrollbar">
-                            <div className="flex flex-col gap-3">
+                            <div className="flex flex-col gap-1.5">
                                 {recentActivities.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center h-full gap-2 text-gray-300 py-8">
-                                        <span className="material-symbols-outlined text-[48px]">receipt_long</span>
-                                        <p className="text-sm font-medium">Henüz işlem yok</p>
+                                    <div className="flex flex-col items-center justify-center h-full gap-2 text-gray-300 py-6">
+                                        <span className="material-symbols-outlined text-[36px]">receipt_long</span>
+                                        <p className="text-xs font-medium">Henüz işlem yok</p>
                                     </div>
                                 ) : (
                                     recentActivities.map((activity) => (
                                         <div
                                             key={activity.id}
-                                            className="flex items-center gap-4 p-3 rounded-xl hover:bg-gray-50 transition-colors group cursor-pointer border border-transparent hover:border-gray-100"
+                                            className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-gray-50 transition-colors group cursor-pointer border border-transparent hover:border-gray-100"
                                         >
                                             <div className="relative">
-                                                <div className="w-12 h-12 rounded-xl bg-[#10B981]/10 text-[#10B981] flex items-center justify-center">
-                                                    <span className="material-symbols-outlined">payments</span>
+                                                <div className="w-8 h-8 rounded-lg bg-[#10B981]/10 text-[#10B981] flex items-center justify-center">
+                                                    <span className="material-symbols-outlined text-[16px]">payments</span>
                                                 </div>
-                                                <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm">
+                                                <div className="absolute -bottom-0.5 -right-0.5 bg-white rounded-full p-0.5 shadow-sm">
                                                     <div className="bg-[#10B981] rounded-full p-0.5">
-                                                        <span className="material-symbols-outlined text-[12px] text-white block">
-                                                            check
-                                                        </span>
+                                                        <span className="material-symbols-outlined text-[9px] text-white block">check</span>
                                                     </div>
                                                 </div>
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-bold text-[#1F2937] truncate">{activity.title}</p>
-                                                <p className="text-xs text-gray-500 truncate">{activity.description}</p>
+                                                <p className="text-xs font-bold text-[#1F2937] truncate">{activity.title}</p>
+                                                <p className="text-[11px] text-gray-500 truncate">{activity.description}</p>
                                             </div>
                                             <div className="text-right">
                                                 {activity.amount && (
-                                                    <p className="text-sm font-bold text-[#1F2937]">
+                                                    <p className="text-xs font-bold text-[#1F2937]">
                                                         {'\u20BA'}{activity.amount.toLocaleString('tr-TR')}
                                                     </p>
                                                 )}
@@ -409,30 +407,30 @@ export default function SummaryContent(props: SummaryContentProps) {
                     </div>
 
                     {/* Vardiyalı Personeller */}
-                    <div className="bg-white rounded-2xl p-6 flex flex-col shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] border border-gray-100 h-[420px]">
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 shrink-0 min-h-[56px] gap-4">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-50 to-indigo-50 flex items-center justify-center text-purple-600">
-                                    <span className="material-symbols-outlined text-[24px]">groups</span>
+                    <div className="bg-white rounded-2xl p-4 flex flex-col shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] border border-gray-100 h-[302px]">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-3 shrink-0 min-h-[40px] gap-2">
+                            <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-50 to-indigo-50 flex items-center justify-center text-purple-600">
+                                    <span className="material-symbols-outlined text-[17px]">groups</span>
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-bold text-[#1F2937] leading-tight">Vardiyalı Personeller</h3>
-                                    <p className="text-xs text-gray-500 leading-tight mt-1">Bugün çalışanlar ve durumları</p>
+                                    <h3 className="text-sm font-bold text-[#1F2937] leading-tight">Vardiyalı Personeller</h3>
+                                    <p className="text-[11px] text-gray-500 leading-tight">Bugün çalışanlar ve durumları</p>
                                 </div>
                             </div>
                             <button
                                 onClick={onNavigateToShifts}
-                                className="text-xs text-[#663259] hover:text-[#8E44AD] font-bold bg-[#663259]/5 px-3 py-1.5 rounded-md transition-colors shrink-0"
+                                className="text-[11px] text-[#663259] hover:text-[#8E44AD] font-bold bg-[#663259]/5 px-2.5 py-1 rounded-md transition-colors shrink-0"
                             >
                                 Vardiya
                             </button>
                         </div>
                         <div className="flex-1 overflow-y-auto -mr-3 pr-3 custom-scrollbar">
-                            <div className="flex flex-col gap-3">
+                            <div className="flex flex-col gap-1.5">
                                 {employees.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center h-full gap-2 text-gray-300 py-8">
-                                        <span className="material-symbols-outlined text-[48px]">groups</span>
-                                        <p className="text-sm font-medium">Henüz personel eklenmedi</p>
+                                    <div className="flex flex-col items-center justify-center h-full gap-2 text-gray-300 py-6">
+                                        <span className="material-symbols-outlined text-[36px]">groups</span>
+                                        <p className="text-xs font-medium">Henüz personel eklenmedi</p>
                                     </div>
                                 ) : (
                                     employees.map((emp) => {
@@ -443,21 +441,21 @@ export default function SummaryContent(props: SummaryContentProps) {
                                         const badgeBg = isActive ? 'bg-green-100 text-green-700' : isLeave ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600';
                                         const badgeText = isActive ? 'Çalışıyor' : isLeave ? 'İzinli' : 'Ayrıldı';
                                         return (
-                                            <div key={emp.id} className="flex items-center gap-4 p-3 rounded-xl hover:bg-gray-50 transition-colors group cursor-pointer border border-transparent hover:border-gray-100">
+                                            <div key={emp.id} className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-gray-50 transition-colors group cursor-pointer border border-transparent hover:border-gray-100">
                                                 <div className="relative">
-                                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#663259] to-[#8E44AD] flex items-center justify-center text-white font-bold text-sm shadow-md">
+                                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#663259] to-[#8E44AD] flex items-center justify-center text-white font-bold text-[11px] shadow-md">
                                                         {initials}
                                                     </div>
                                                     <div className="absolute -bottom-0.5 -right-0.5 bg-white rounded-full p-0.5">
-                                                        <div className={`w-3 h-3 rounded-full ${dotColor} border-2 border-white`}></div>
+                                                        <div className={`w-2 h-2 rounded-full ${dotColor} border-2 border-white`}></div>
                                                     </div>
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-bold text-[#1F2937] truncate">{emp.name}</p>
-                                                    <p className="text-xs text-gray-500 truncate">{emp.department} {'\u00B7'} {emp.shift}</p>
+                                                    <p className="text-xs font-bold text-[#1F2937] truncate">{emp.name}</p>
+                                                    <p className="text-[11px] text-gray-500 truncate">{emp.department} {'\u00B7'} {emp.shift}</p>
                                                 </div>
                                                 <div className="shrink-0">
-                                                    <span className={`px-2 py-1 ${badgeBg} text-[10px] font-bold rounded-md`}>
+                                                    <span className={`px-1.5 py-0.5 ${badgeBg} text-[10px] font-bold rounded`}>
                                                         {badgeText}
                                                     </span>
                                                 </div>
