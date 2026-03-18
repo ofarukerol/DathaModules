@@ -293,7 +293,7 @@ const SAMPLE_CUSTOMERS: Customer[] = [
 export const useCustomerStore = create<CustomerState>()(
     persist(
         (set, get) => ({
-            customers: [...SAMPLE_CUSTOMERS, ...DEMO_CUSTOMERS],
+            customers: [],
             nonPayableReasons: [
                 { id: 'np-1', name: 'Personel Yemek', type: 'personel' },
                 { id: 'np-2', name: 'Patron İkramı', type: 'ikram' },
@@ -336,24 +336,18 @@ export const useCustomerStore = create<CustomerState>()(
         }),
         {
             name: 'customer-storage',
-            version: 2,
+            version: 3,
             migrate: (persistedState: unknown, version) => {
-                if (version < 2) return {};
+                // v0-2 → v3: demo/sample veriler kaldirildi, temiz baslat
+                if (version < 3) {
+                    const old = persistedState as Partial<CustomerState>;
+                    // Eski demo/sample verileri filtrele, sadece gercek musterileri koru
+                    const realCustomers = (old.customers || []).filter(
+                        (c: Customer) => !c.id.startsWith('demo-') && !c.id.startsWith('sample-')
+                    );
+                    return { customers: realCustomers };
+                }
                 return persistedState;
-            },
-            merge: (persistedState: unknown, currentState) => {
-                const persisted = persistedState as Partial<CustomerState>;
-                const persistedIds = new Set(
-                    (persisted.customers || []).map((c: Customer) => c.id)
-                );
-                const missingSamples = currentState.customers.filter(
-                    (c) => c.id.startsWith('sample-') && !persistedIds.has(c.id)
-                );
-                return {
-                    ...currentState,
-                    ...persisted,
-                    customers: [...(persisted.customers || []), ...missingSamples],
-                };
             },
         }
     )
