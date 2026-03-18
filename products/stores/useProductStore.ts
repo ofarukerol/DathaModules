@@ -59,51 +59,8 @@ interface ProductStore {
 export const useProductStore = create<ProductStore>()(
     persist(
         (set) => ({
-            products: [
-                // ── Burgerler (4) ──
-                { id: '1', name: 'Cheeseburger', price: 180, category: 'Burgerler', description: '180gr dana eti, cheddar, turşu, özel sos', icon: 'lunch_dining', trackStock: true, stockQuantity: 50 },
-                { id: '2', name: 'BBQ Burger', price: 195, category: 'Burgerler', description: 'Barbekü sos, karamelize soğan, füme et', icon: 'lunch_dining', trackStock: true, stockQuantity: 40 },
-                { id: '3', name: 'Double Burger', price: 240, category: 'Burgerler', description: '2x 180gr dana eti, cheddar, soğan', icon: 'lunch_dining', trackStock: true, stockQuantity: 30 },
-                { id: '12', name: 'Mantar Burger', price: 205, category: 'Burgerler', description: 'Sote mantar, swiss peyniri, özel sos', icon: 'lunch_dining', trackStock: true, stockQuantity: 25 },
-                // ── İçecekler (5) ──
-                { id: '4', name: 'Coca Cola', price: 45, category: 'İçecekler', description: '330ml Kutu', icon: 'local_drink', trackStock: true, stockQuantity: 100 },
-                { id: '5', name: 'Ayran', price: 30, category: 'İçecekler', description: '300ml Şişe', icon: 'local_drink', trackStock: true, stockQuantity: 80 },
-                { id: '13', name: 'Çay', price: 20, category: 'İçecekler', description: 'Demlik çay', icon: 'local_drink', trackStock: true, stockQuantity: 200 },
-                { id: '14', name: 'Limonata', price: 55, category: 'İçecekler', description: 'Taze sıkılmış limon, nane', icon: 'local_drink', trackStock: true, stockQuantity: 60 },
-                { id: '15', name: 'Su (500ml)', price: 15, category: 'İçecekler', description: '500ml Şişe su', icon: 'local_drink', trackStock: true, stockQuantity: 150 },
-                // ── Salatalar (2) ──
-                { id: '6', name: 'Mevsim Salata', price: 85, category: 'Salatalar', description: 'Taze yeşillikler, zeytinyağı sos', icon: 'restaurant', trackStock: true, stockQuantity: 30 },
-                { id: '7', name: 'Sezar Salata', price: 120, category: 'Salatalar', description: 'Izgara tavuk, kruton, parmesan', icon: 'restaurant', trackStock: true, stockQuantity: 25 },
-                // ── Ana Yemekler (4) ──
-                { id: '16', name: 'Köfte Ekmek', price: 120, category: 'Ana Yemekler', description: 'El yapımı köfte, ekmek, domates, biber', icon: 'restaurant_menu', trackStock: true, stockQuantity: 40 },
-                { id: '17', name: 'Tavuk Şiş', price: 160, category: 'Ana Yemekler', description: 'Marine tavuk şiş, pilav, salata', icon: 'restaurant_menu', trackStock: true, stockQuantity: 35 },
-                { id: '18', name: 'Döner (Tabak)', price: 145, category: 'Ana Yemekler', description: 'Dana döner tabak, pilav, salata', icon: 'restaurant_menu', trackStock: true, stockQuantity: 45 },
-                { id: '19', name: 'Karışık Pizza', price: 220, category: 'Ana Yemekler', description: '32cm, sucuk, mantar, biber, mozzarella', icon: 'restaurant_menu', trackStock: true, stockQuantity: 20 },
-                // ── Atıştırmalıklar (3) ──
-                { id: '20', name: 'Patates Kızartması', price: 65, category: 'Atıştırmalıklar', description: 'Çıtır patates, ketçap veya mayonez', icon: 'fastfood', trackStock: true, stockQuantity: 60 },
-                { id: '21', name: 'Soğan Halkası', price: 70, category: 'Atıştırmalıklar', description: 'Çıtır soğan halkası, ranch sos', icon: 'fastfood', trackStock: true, stockQuantity: 40 },
-                { id: '22', name: 'Mozzarella Stick', price: 85, category: 'Atıştırmalıklar', description: '6 adet, marinara sos ile', icon: 'fastfood', trackStock: true, stockQuantity: 35 },
-                // ── Çorbalar (2) ──
-                { id: '23', name: 'Mercimek Çorbası', price: 75, category: 'Çorbalar', description: 'Geleneksel kırmızı mercimek', icon: 'soup_kitchen', trackStock: true, stockQuantity: 50 },
-                { id: '24', name: 'Domates Çorbası', price: 80, category: 'Çorbalar', description: 'Kremalı domates, fesleğen', icon: 'soup_kitchen', trackStock: true, stockQuantity: 40 },
-                // ── Tatlılar (3) ──
-                { id: '8', name: 'Sufle', price: 110, category: 'Tatlılar', description: 'Belçika çikolatalı, dondurma ile', icon: 'cake', trackStock: true, stockQuantity: 20 },
-                { id: '9', name: 'Cheesecake', price: 100, category: 'Tatlılar', description: 'Limonlu veya Frambuazlı', icon: 'cake', trackStock: true, stockQuantity: 25 },
-                { id: '25', name: 'Brownie', price: 95, category: 'Tatlılar', description: 'Sıcak çikolatalı brownie, dondurma', icon: 'cake', trackStock: true, stockQuantity: 30 },
-                // ── Kahveler (2) ──
-                { id: '10', name: 'Latte', price: 65, category: 'Kahveler', description: 'Sütlü espresso', icon: 'coffee', trackStock: true, stockQuantity: 0 },
-                { id: '11', name: 'Türk Kahvesi', price: 50, category: 'Kahveler', description: 'Çifte kavrulmuş', icon: 'coffee', trackStock: true, stockQuantity: 0 },
-            ],
-            categories: [
-                { id: 'Burgerler', name: 'Burgerler', icon: 'lunch_dining', color: 'bg-[#FEF3C7]', text: 'text-[#92400E]', border: 'border-yellow-100', hover: 'hover:border-yellow-300', iconColor: 'text-yellow-500' },
-                { id: 'İçecekler', name: 'İçecekler', icon: 'local_drink', color: 'bg-[#DBEAFE]', text: 'text-[#1E40AF]', border: 'border-blue-100', hover: 'hover:border-blue-300', iconColor: 'text-blue-500' },
-                { id: 'Salatalar', name: 'Salatalar', icon: 'restaurant', color: 'bg-[#D1FAE5]', text: 'text-[#065F46]', border: 'border-green-100', hover: 'hover:border-green-300', iconColor: 'text-green-600' },
-                { id: 'Ana Yemekler', name: 'Ana Yemekler', icon: 'restaurant_menu', color: 'bg-[#FEE2E2]', text: 'text-[#991B1B]', border: 'border-red-100', hover: 'hover:border-red-300', iconColor: 'text-red-500' },
-                { id: 'Atıştırmalıklar', name: 'Atıştırmalıklar', icon: 'fastfood', color: 'bg-[#FEF9C3]', text: 'text-[#854D0E]', border: 'border-yellow-100', hover: 'hover:border-yellow-300', iconColor: 'text-amber-500' },
-                { id: 'Çorbalar', name: 'Çorbalar', icon: 'soup_kitchen', color: 'bg-[#FFEDD5]', text: 'text-[#9A3412]', border: 'border-orange-100', hover: 'hover:border-orange-300', iconColor: 'text-orange-500' },
-                { id: 'Tatlılar', name: 'Tatlılar', icon: 'cake', color: 'bg-[#FCE7F3]', text: 'text-[#9D174D]', border: 'border-pink-100', hover: 'hover:border-pink-300', iconColor: 'text-pink-500' },
-                { id: 'Kahveler', name: 'Kahveler', icon: 'coffee', color: 'bg-[#F3E8FF]', text: 'text-[#6B21A8]', border: 'border-purple-100', hover: 'hover:border-purple-300', iconColor: 'text-purple-600' },
-            ],
+            products: [],
+            categories: [],
             quickNotes: ['Az Pişmiş', 'Orta Pişmiş', 'Çok Pişmiş', 'Soğansız', 'Acısız', 'Bol Soslu', 'Paket Olsun'],
             orderNotes: [
                 { id: '1', text: 'Acele sipariş' },
@@ -272,37 +229,21 @@ export const useProductStore = create<ProductStore>()(
         }),
         {
             name: 'product-store',
-            version: 3,
+            version: 4,
             migrate: (persistedState: any, version) => {
-                // v0→v1→v2: eski cache temizle, yeni initial state'le başla
                 if (version < 2) return {};
-                // v2→v3: serverId field eklendi (mevcut veriler undefined olarak kalir)
                 if (version < 3) return persistedState;
+                if (version < 4) {
+                    const old = persistedState as any;
+                    const demoProductIds = new Set(['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24','25']);
+                    const demoCategoryIds = new Set(['Burgerler','İçecekler','Salatalar','Ana Yemekler','Atıştırmalıklar','Çorbalar','Tatlılar','Kahveler']);
+                    return {
+                        ...old,
+                        products: (old.products || []).filter((p: any) => !demoProductIds.has(p.id) || p.serverId),
+                        categories: (old.categories || []).filter((c: any) => !demoCategoryIds.has(c.id) || c.serverId),
+                    };
+                }
                 return persistedState;
-            },
-            merge: (persistedState: any, currentState) => {
-                // Persisted listede olmayan yeni default ürünleri ekle
-                const persistedIds = new Set(
-                    (persistedState.products || []).map((p: Product) => p.id)
-                );
-                const newDefaults = currentState.products.filter(
-                    (p) => !persistedIds.has(p.id)
-                );
-                // Persisted listede olmayan yeni default kategorileri ekle
-                const persistedCatIds = new Set(
-                    (persistedState.categories || []).map((c: Category) => c.id)
-                );
-                const newDefaultCats = currentState.categories.filter(
-                    (c) => !persistedCatIds.has(c.id)
-                );
-                return {
-                    ...currentState,
-                    ...persistedState,
-                    products: [...(persistedState.products || []), ...newDefaults],
-                    categories: [...(persistedState.categories || []), ...newDefaultCats],
-                    quickNotes: persistedState.quickNotes || currentState.quickNotes,
-                    orderNotes: persistedState.orderNotes || currentState.orderNotes,
-                };
             },
         }
     )

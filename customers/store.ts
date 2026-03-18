@@ -338,10 +338,8 @@ export const useCustomerStore = create<CustomerState>()(
             name: 'customer-storage',
             version: 3,
             migrate: (persistedState: unknown, version) => {
-                // v0-2 → v3: demo/sample veriler kaldirildi, temiz baslat
                 if (version < 3) {
                     const old = persistedState as Partial<CustomerState>;
-                    // Eski demo/sample verileri filtrele, sadece gercek musterileri koru
                     const realCustomers = (old.customers || []).filter(
                         (c: Customer) => !c.id.startsWith('demo-') && !c.id.startsWith('sample-')
                     );
