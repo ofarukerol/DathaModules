@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import DatePicker from './DatePicker';
 import TagSelector from './TagSelector';
+import { uuidv7 } from '@/utils/uuid';
 
 interface DBUser {
     id: string;
@@ -60,7 +61,7 @@ const EditTodoModal: React.FC<EditTodoModalProps> = ({ isOpen, onClose, todo, cu
     const handleAddComment = async () => {
         if (!newComment.trim()) return;
         const comment: TodoComment = {
-            id: crypto.randomUUID(),
+            id: uuidv7(),
             todo_id: todo.id,
             author: currentUserName || 'Anonim',
             content: newComment.trim(),

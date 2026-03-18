@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { Plus, Download, History } from 'lucide-react';
 import DatePicker from '../../../components/DatePicker';
 import BankTransactionModal from '../components/BankTransactionModal';
@@ -15,7 +15,6 @@ import EInvoiceIntegrationModal from '../components/EInvoiceIntegrationModal';
 import * as XLSX from 'xlsx';
 
 const BankDetail: React.FC = () => {
-    const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
     const { accounts, fetchAccounts } = useBankAccountStore();
     const { transactions, isLoading, fetchTransactions, deleteTransaction, unmatchTransaction } = useBankTransactionStore();

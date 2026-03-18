@@ -1079,9 +1079,6 @@ export default function Banks() {
                                         <button onClick={() => navigate('/finance/invoices')} className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 hover:border-[#663259]/30 transition-all text-sm font-medium shadow-sm group">
                                             <span className="material-symbols-outlined text-[18px] text-gray-400 group-hover:text-[#663259] transition-colors">receipt</span>Fatura Öde
                                         </button>
-                                        <button onClick={() => navigate('/personnel/payroll')} className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 hover:border-[#663259]/30 transition-all text-sm font-medium shadow-sm group">
-                                            <span className="material-symbols-outlined text-[18px] text-gray-400 group-hover:text-[#663259] transition-colors">badge</span>Maaş Ödemesi
-                                        </button>
                                         <div className="h-8 w-[1px] bg-gray-200 mx-1 hidden md:block" />
                                         <button onClick={() => openFinanceModal('income')} className="flex items-center gap-2 px-5 py-2.5 bg-[#663259] text-white rounded-lg hover:bg-[#4A235A] transition-all text-sm font-semibold shadow-md hover:shadow-lg active:scale-95">
                                             <span className="material-symbols-outlined text-[20px]">add</span>Gelir Ekle

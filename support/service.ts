@@ -1,6 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 import { api, isOnline } from '../_shared/api';
 import { getReadyDb } from '../_shared/db';
+import { uuidv7 } from '../../utils/uuid';
 import type {
     SupportTicket,
     SupportTicketMessage,
@@ -91,7 +92,7 @@ export const supportTicketService = {
             return data.data;
         }
 
-        const id = crypto.randomUUID();
+        const id = uuidv7();
         const now = new Date().toISOString();
         const userId = getUserId();
         const category = dto.category || 'GENERAL';
@@ -109,7 +110,7 @@ export const supportTicketService = {
             await db.execute(
                 `INSERT INTO support_ticket_messages (id, ticket_id, sender_type, sender_id, body, synced, created_at)
                  VALUES ($1, $2, 'USER', $3, $4, 0, $5)`,
-                [crypto.randomUUID(), id, userId, dto.body, now]
+                [uuidv7(), id, userId, dto.body, now]
             );
         }
 
@@ -139,7 +140,7 @@ export const supportTicketService = {
                         `INSERT INTO sync_queue (id, event_type, payload_json, status, retry_count, created_at)
                          VALUES ($1, $2, $3, 'PENDING', 0, $4)`,
                         [
-                            crypto.randomUUID(),
+                            uuidv7(),
                             'SUPPORT_TICKET_CREATED',
                             JSON.stringify({ localId: id, subject: dto.subject, body: dto.body, category, priority }),
                             now
@@ -154,7 +155,7 @@ export const supportTicketService = {
                     `INSERT INTO sync_queue (id, event_type, payload_json, status, retry_count, created_at)
                      VALUES ($1, $2, $3, 'PENDING', 0, $4)`,
                     [
-                        crypto.randomUUID(),
+                        uuidv7(),
                         'SUPPORT_TICKET_CREATED',
                         JSON.stringify({ localId: id, subject: dto.subject, body: dto.body, category, priority }),
                         now
@@ -241,7 +242,7 @@ export const supportTicketService = {
                             await db.execute(
                                 `INSERT OR IGNORE INTO support_tickets (id, server_id, subject, body, category, priority, status, user_id, synced, created_at, updated_at)
                                  VALUES ($1, $2, $3, '', $4, $5, $6, $7, 1, $8, $9)`,
-                                [crypto.randomUUID(), rt.id, rt.subject, rt.category, rt.priority, rt.status, rt.userId, rt.createdAt, rt.updatedAt]
+                                [uuidv7(), rt.id, rt.subject, rt.category, rt.priority, rt.status, rt.userId, rt.createdAt, rt.updatedAt]
                             );
                         }
                     }
@@ -316,7 +317,7 @@ export const supportTicketService = {
                                     await db.execute(
                                         `INSERT OR IGNORE INTO support_ticket_messages (id, ticket_id, server_id, sender_type, sender_id, body, synced, created_at)
                                          VALUES ($1, $2, $3, $4, $5, $6, 1, $7)`,
-                                        [crypto.randomUUID(), ticket._localId, msg.id, msg.senderType, msg.senderId, msg.body, msg.createdAt]
+                                        [uuidv7(), ticket._localId, msg.id, msg.senderType, msg.senderId, msg.body, msg.createdAt]
                                     );
                                 }
                             }
@@ -357,7 +358,7 @@ export const supportTicketService = {
         // Web mode (DathaManager): SQLite yok, doğrudan API'ye gönder
         if (!db) {
             if (!isOnline()) {
-                const msgId = crypto.randomUUID();
+                const msgId = uuidv7();
                 return { id: msgId, senderType: 'USER', senderId: userId, body, createdAt: now };
             }
             const { data } = await api.post<ApiResponse<SupportTicketMessage>>(
@@ -367,7 +368,7 @@ export const supportTicketService = {
             return data.data;
         }
 
-        const msgId = crypto.randomUUID();
+        const msgId = uuidv7();
 
         // Local ticket ID'yi bul
         let localTicketId = ticketId;
@@ -412,7 +413,7 @@ export const supportTicketService = {
                         `INSERT INTO sync_queue (id, event_type, payload_json, status, retry_count, created_at)
                          VALUES ($1, $2, $3, 'PENDING', 0, $4)`,
                         [
-                            crypto.randomUUID(),
+                            uuidv7(),
                             'SUPPORT_TICKET_MESSAGE',
                             JSON.stringify({ ticketLocalId: localTicketId, messageLocalId: msgId, body }),
                             now
@@ -426,7 +427,7 @@ export const supportTicketService = {
                 `INSERT INTO sync_queue (id, event_type, payload_json, status, retry_count, created_at)
                  VALUES ($1, $2, $3, 'PENDING', 0, $4)`,
                 [
-                    crypto.randomUUID(),
+                    uuidv7(),
                     'SUPPORT_TICKET_MESSAGE',
                     JSON.stringify({ ticketLocalId: localTicketId, messageLocalId: msgId, body }),
                     now

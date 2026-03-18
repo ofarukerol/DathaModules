@@ -4,6 +4,7 @@ import { Todo, Tag } from '../types';
 import { todoService } from '../service';
 import AddTodoModal from './AddTodoModal';
 import EditTodoModal from './EditTodoModal';
+import { uuidv7 } from '../../../utils/uuid';
 import {
     DndContext,
     DragEndEvent,
@@ -60,7 +61,7 @@ const TodoKanban: React.FC<TodoKanbanProps> = ({ currentUserName, getUsersFn }) 
 
     const handleAddTag = async () => {
         if (!newTagName.trim()) return;
-        const tag: Tag = { id: crypto.randomUUID(), name: newTagName.trim(), color: newTagColor };
+        const tag: Tag = { id: uuidv7(), name: newTagName.trim(), color: newTagColor };
         await todoService.addTag(tag);
         setTags(prev => [...prev, tag]);
         setNewTagName('');

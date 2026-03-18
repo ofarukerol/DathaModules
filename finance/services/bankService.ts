@@ -2,6 +2,7 @@ import { getDb } from '../../_shared/db';
 import api from '../../_shared/api';
 import type { BankAccount, BankTransaction, BankTransactionType } from '../types';
 import { generateId, nowISO } from '../../_shared/helpers';
+import { enqueueSync } from '../../../utils/syncQueue';
 
 const BANK_THEME: Record<string, { code: string; color: string }> = {
     'Yapı Kredi': { code: 'YKB', color: '#003F7F' },
@@ -95,6 +96,10 @@ export const bankService = {
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', $10, $11)`,
             [id, data.name, data.bank_name, data.iban ?? null, data.currency ?? 'TRY', data.balance ?? 0, data.is_default ?? 0, theme.code, theme.color, now, now]
         );
+        await enqueueSync('BANK_ACCOUNT_CREATED', {
+            localId: id, name: data.name, bankName: data.bank_name,
+            iban: data.iban, currency: data.currency ?? 'TRY', balance: data.balance ?? 0,
+        });
         return id;
     },
 
@@ -125,6 +130,7 @@ export const bankService = {
         values.push(nowISO());
 
         await db.execute(`UPDATE bank_accounts SET ${fields.join(', ')} WHERE id = $1`, values);
+        await enqueueSync('BANK_ACCOUNT_UPDATED', { localId: id, ...data });
     },
 
     async deleteAccount(id: string): Promise<void> {
@@ -265,6 +271,10 @@ export const bankService = {
             [data.bank_account_id, data.amount * sign, nowISO()]
         );
 
+        await enqueueSync('BANK_TRANSACTION_CREATED', {
+            localId: id, bankAccountId: data.bank_account_id,
+            type: data.type, amount: data.amount, description: data.description, date: data.date,
+        });
         return id;
     },
 };

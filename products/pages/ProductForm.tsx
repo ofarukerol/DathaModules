@@ -4,6 +4,7 @@ import { useProductStore } from '../stores/useProductStore';
 import type { Product, Portion, RecipeItem } from '../types';
 import CategoryModal from '../components/CategoryModal';
 import CustomSelect from '../../../components/CustomSelect';
+import { uuidv7 } from '@/utils/uuid';
 
 const ProductForm: React.FC = () => {
     const navigate = useNavigate();
@@ -239,7 +240,7 @@ const ProductForm: React.FC = () => {
     const addPortion = () => {
         if (!newPortionName || !newPortionPrice) return;
         const newPortion: Portion = {
-            id: crypto.randomUUID(),
+            id: uuidv7(),
             name: newPortionName,
             price: parseFloat(newPortionPrice)
         };
@@ -1014,7 +1015,7 @@ const ProductForm: React.FC = () => {
                                                         const qty = parseFloat(newRecipeQuantity) || 0;
                                                         const up = parseFloat(newRecipeUnitPrice) || 0;
                                                         const newItem: RecipeItem = {
-                                                            id: crypto.randomUUID(),
+                                                            id: uuidv7(),
                                                             name: newRecipeName.trim(),
                                                             description: newRecipeDesc.trim() || undefined,
                                                             quantity: qty,

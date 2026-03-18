@@ -1,6 +1,7 @@
 import { getDb } from '../../_shared/db';
 import api from '../../_shared/api';
 import { nowISO } from '../../_shared/helpers';
+import { enqueueSync } from '../../../utils/syncQueue';
 
 // Bank theme lookup — code/color is derived from bank_name if not stored
 const BANK_THEME: Record<string, { code: string; color: string }> = {
@@ -83,6 +84,10 @@ export const bankAccountService = {
             [account.id, account.name, account.bank_name, account.iban ?? null, account.currency ?? 'TRY',
              account.balance ?? 0, account.is_default ?? 0, theme.code, theme.color, account.status ?? 'active', now, now]
         );
+        await enqueueSync('BANK_ACCOUNT_CREATED', {
+            localId: account.id, name: account.name, bankName: account.bank_name,
+            iban: account.iban, currency: account.currency ?? 'TRY', balance: account.balance ?? 0,
+        });
     },
 
     async update(id: string, data: Partial<Omit<BankAccount, 'id' | 'created_at'>>): Promise<void> {
@@ -113,6 +118,7 @@ export const bankAccountService = {
             `UPDATE bank_accounts SET ${fields.join(', ')} WHERE id = $${idx}`,
             values
         );
+        await enqueueSync('BANK_ACCOUNT_UPDATED', { localId: id, ...data });
     },
 
     async delete(id: string): Promise<void> {

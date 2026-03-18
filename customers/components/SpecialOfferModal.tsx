@@ -5,6 +5,7 @@ import { useCustomerStore } from '../store';
 import type { SpecialOffer, SpecialOfferType } from '../types';
 import CustomSelect from '../../../components/CustomSelect';
 import DatePicker from '../../../components/DatePicker';
+import { uuidv7 } from '@/utils/uuid';
 
 interface SpecialOfferModalProps {
     isOpen: boolean;
@@ -87,7 +88,7 @@ export default function SpecialOfferModal({ isOpen, onClose, customerId, custome
         }
 
         const newOffer: SpecialOffer = {
-            id: crypto.randomUUID(),
+            id: uuidv7(),
             type: offerType,
             value: offerType === 'free_product' ? (selectedProduct?.price || 0) : parseFloat(value),
             productId: offerType === 'free_product' ? productId : undefined,

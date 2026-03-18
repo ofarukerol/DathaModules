@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { getReadyDb } from '../../_shared/db';
 import type { Product, Category, OrderNote } from '../types';
+import { uuidv7 } from '@/utils/uuid';
 
 /** Ürün güncellemesini hemen backend'e push et (queue'ya ek, best-effort) */
 async function immediatePushProduct(localId: string) {
@@ -25,7 +26,7 @@ async function enqueueSyncEvent(eventType: string, payload: Record<string, unkno
     try {
         const db = await getReadyDb();
         if (!db) return;
-        const id = crypto.randomUUID();
+        const id = uuidv7();
         await db.execute(
             `INSERT INTO sync_queue (id, event_type, payload_json, status, retry_count, created_at)
              VALUES ($1, $2, $3, 'PENDING', 0, datetime('now'))`,
@@ -70,7 +71,7 @@ export const useProductStore = create<ProductStore>()(
                 { id: '5', text: 'Ekstra peçete' },
             ],
             addProduct: (product) => {
-                const id = crypto.randomUUID();
+                const id = uuidv7();
                 const now = new Date().toISOString();
                 set((state) => ({
                     products: [...state.products, { trackStock: true, stockQuantity: 0, ...product, id, updatedAt: now }]

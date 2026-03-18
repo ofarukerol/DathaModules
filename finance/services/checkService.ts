@@ -2,6 +2,7 @@ import { getDb } from '../../_shared/db';
 import api from '../../_shared/api';
 import { generateId, nowISO } from '../../_shared/helpers';
 import type { CheckNote, CheckType, CheckStatus } from '../types';
+import { enqueueSync } from '../../../utils/syncQueue';
 
 export interface CheckStats {
     receivedTotal: number;
@@ -96,6 +97,12 @@ export const checkService = {
              data.issue_date, data.due_date, data.bank_name ?? null, data.check_number ?? null,
              data.notes ?? null, data.endorser ?? null, now, now]
         );
+        await enqueueSync('CHECK_CREATED', {
+            localId: id, type: data.type, amount: data.amount,
+            issueDate: data.issue_date, dueDate: data.due_date,
+            companyId: data.company_id, bankName: data.bank_name,
+            checkNumber: data.check_number, notes: data.notes,
+        });
         return id;
     },
 
@@ -109,6 +116,7 @@ export const checkService = {
             'UPDATE checks SET status = $2, updated_at = $3 WHERE id = $1',
             [id, status, nowISO()]
         );
+        await enqueueSync('CHECK_UPDATED', { localId: id, status });
     },
 
     async deleteCheck(id: string): Promise<void> {

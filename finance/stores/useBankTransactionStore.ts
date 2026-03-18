@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { bankTransactionService, BankTransaction } from '../services/bankTransactionService';
+import { uuidv7 } from '@/utils/uuid';
 
 interface BankTransactionStore {
     transactions: BankTransaction[];
@@ -29,7 +30,7 @@ export const useBankTransactionStore = create<BankTransactionStore>((set, get) =
     },
 
     addTransaction: async (data) => {
-        const id = crypto.randomUUID();
+        const id = uuidv7();
         const newTx: BankTransaction = {
             ...data,
             id,
@@ -48,7 +49,7 @@ export const useBankTransactionStore = create<BankTransactionStore>((set, get) =
     bulkAddTransactions: async (transactions) => {
         const withIds = transactions.map((t) => ({
             ...t,
-            id: crypto.randomUUID(),
+            id: uuidv7(),
             created_at: new Date().toISOString(),
         }));
 

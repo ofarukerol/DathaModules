@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, ReactNode } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import FinanceTransactionModal from '../components/FinanceTransactionModal';
 import { useFinanceStore } from '../../../stores/useFinanceStore';
 import { useFinanceCategoryStore } from '../stores/useFinanceCategoryStore';
@@ -28,6 +29,7 @@ const formatDate = (dateStr: string) => {
 };
 
 const IncomeExpense: React.FC = () => {
+    const navigate = useNavigate();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalType, setModalType] = useState<'income' | 'expense'>('income');
 

@@ -1,6 +1,7 @@
 import { getDb } from '../../_shared/db';
 import api from '../../_shared/api';
 import { nowISO } from '../../_shared/helpers';
+import { enqueueSync } from '../../../utils/syncQueue';
 
 export interface BankTransaction {
     id: string;
@@ -58,6 +59,10 @@ export const bankTransactionService = {
              tx.balance_after ?? null, tx.reference_id ?? null, tx.category ?? null,
              tx.matched_transaction_id ?? null, tx.is_imported ?? 0, nowISO()]
         );
+        await enqueueSync('BANK_TRANSACTION_CREATED', {
+            localId: tx.id, bankAccountId: tx.bank_account_id,
+            type: tx.type, amount: tx.amount, description: tx.description, date: tx.date,
+        });
     },
 
     async bulkCreate(transactions: Omit<BankTransaction, 'created_at'>[]): Promise<void> {

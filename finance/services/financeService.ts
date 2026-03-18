@@ -2,6 +2,7 @@ import { getDb } from '../../_shared/db';
 import api from '../../_shared/api';
 import type { FinanceCategory, FinanceTransaction, TransactionType, PaymentMethod } from '../types';
 import { generateId, nowISO } from '../../_shared/helpers';
+import { enqueueSync } from '../../../utils/syncQueue';
 
 interface TransactionFilters {
     type?: TransactionType | '';
@@ -176,6 +177,12 @@ export const financeService = {
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
             [id, data.company_id ?? null, data.category_id ?? null, data.employee_id ?? null, data.type, data.amount, data.currency ?? 'TRY', data.description ?? null, data.date, data.payment_method ?? null, now, now]
         );
+        await enqueueSync('FINANCE_TRANSACTION_CREATED', {
+            localId: id, type: data.type, amount: data.amount,
+            date: data.date, categoryId: data.category_id,
+            companyId: data.company_id, bankAccountId: null,
+            paymentMethod: data.payment_method, description: data.description,
+        });
         return id;
     },
 
@@ -206,6 +213,7 @@ export const financeService = {
         values.push(nowISO());
 
         await db.execute(`UPDATE finance_transactions SET ${fields.join(', ')} WHERE id = $1`, values);
+        await enqueueSync('FINANCE_TRANSACTION_UPDATED', { localId: id, ...data });
     },
 
     async deleteTransaction(id: string): Promise<void> {
@@ -217,15 +225,19 @@ export const financeService = {
             return;
         }
         await db.execute('DELETE FROM finance_transactions WHERE id = $1', [id]);
+        await enqueueSync('FINANCE_TRANSACTION_DELETED', { localId: id });
     },
 
     async getPayrollPayments(month: number, year: number): Promise<{ employee_id: string; total_paid: number }[]> {
         const db = await getDb();
         if (!db) {
             try {
-                const res = await api.get(`/finance/payroll-payments?month=${month}&year=${year}`);
-                const data = res.data;
-                return Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+                const res = await api.get('/payroll/summary', { params: { month, year } });
+                const rows = Array.isArray(res.data?.data) ? res.data.data : [];
+                return rows.map((r: { employeeId: string; totalPaid: number }) => ({
+                    employee_id: r.employeeId,
+                    total_paid: r.totalPaid,
+                }));
             } catch { return []; }
         }
 
@@ -244,6 +256,35 @@ export const financeService = {
              GROUP BY employee_id`,
             [dateFrom, dateTo]
         );
+    },
+
+    /**
+     * Toplu maaş ödemesi kaydet (API üzerinden)
+     * Offline durumda: her ödeme için ayrı ayrı createTransaction çağır
+     */
+    async saveSalaryPayments(payload: {
+        month: number;
+        year: number;
+        method: string;
+        date: string;
+        payments: { employeeId: string; amount: number; description: string }[];
+    }): Promise<void> {
+        const db = await getDb();
+        if (!db) {
+            await api.post('/payroll/payments', payload);
+            return;
+        }
+        // Offline: SQLite'a tek tek kaydet
+        for (const item of payload.payments) {
+            if (item.amount <= 0) continue;
+            const id = generateId();
+            const now = nowISO();
+            await db.execute(
+                `INSERT INTO finance_transactions (id, category_id, employee_id, type, amount, currency, description, date, payment_method, created_at, updated_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+                [id, 'exp_maas', item.employeeId, 'EXPENSE', item.amount, 'TRY', item.description, payload.date, payload.method, now, now]
+            );
+        }
     },
 
     async getMonthlyBreakdown(year: number): Promise<{ month: number; income: number; expense: number }[]> {

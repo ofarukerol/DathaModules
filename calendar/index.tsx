@@ -6,6 +6,7 @@ import DatePicker from './components/DatePicker';
 import RichTextEditor from './components/RichTextEditor';
 import { useEscapeKey } from '../_shared/useEscapeKey';
 import type { StaffMember, EventFormState } from './types';
+import { uuidv7 } from '@/utils/uuid';
 
 // Helper functions
 function toDateKey(date: Date): string {
@@ -207,7 +208,7 @@ const Calendar: React.FC = () => {
         if (!eventForm.title.trim()) return;
 
         const newEvent = {
-            id: crypto.randomUUID(),
+            id: uuidv7(),
             date: eventForm.date || todayKey,
             title: eventForm.title.trim(),
             type: eventForm.type as 'reservation' | 'shift' | 'special' | 'social_media' | 'sms' | 'whatsapp',

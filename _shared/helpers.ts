@@ -1,3 +1,4 @@
+import { uuidv7 } from "../../utils/uuid";
 /**
  * Shared helper utilities for DathaModules.
  * These functions are used by multiple modules and must work in both
@@ -5,7 +6,7 @@
  */
 
 export function generateId(): string {
-    return crypto.randomUUID();
+    return uuidv7();
 }
 
 export function nowISO(): string {

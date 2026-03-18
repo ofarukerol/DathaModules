@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Tag } from '../types';
 import { todoService } from '../service';
 import { Plus, X, Check, Settings, Edit2, Trash2 } from 'lucide-react';
+import { uuidv7 } from '@/utils/uuid';
 
 const COLOR_OPTIONS = [
     { value: 'bg-blue-100 text-blue-600', dot: 'bg-blue-500' },
@@ -72,7 +73,7 @@ const TagSelector: React.FC<TagSelectorProps> = ({ selectedTagIds, onChange }) =
     const handleAddNewTag = async () => {
         if (!newTagName.trim()) return;
         const newTag: Tag = {
-            id: `tag-${crypto.randomUUID().slice(0, 8)}`,
+            id: `tag-${uuidv7().slice(0, 8)}`,
             name: newTagName.trim(),
             color: newTagColor,
         };

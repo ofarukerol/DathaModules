@@ -1,5 +1,6 @@
 import { getReadyDb, isTauri } from './db';
 import { Todo, Tag, TodoComment } from './types';
+import { enqueueSync } from '../../utils/syncQueue';
 
 // ─── localStorage helpers (browser fallback) ───
 
@@ -58,6 +59,12 @@ export const todoService = {
                     'INSERT INTO todos (id, title, description, assignee, due_date, priority, status, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
                     params
                 );
+                await enqueueSync('TODO_CREATED', {
+                    localId: todo.id, title: todo.title, description: todo.description,
+                    assignee: todo.assignee, dueDate: todo.due_date,
+                    priority: (todo.priority || 'normal').toUpperCase(),
+                    status: (todo.status || 'todo').toUpperCase(),
+                });
             } catch (error) {
                 console.error('Failed to add todo:', error);
                 throw error;
@@ -76,6 +83,7 @@ export const todoService = {
             if (!db) return;
             try {
                 await db.execute('UPDATE todos SET status = $1 WHERE id = $2', [status, id]);
+                await enqueueSync('TODO_UPDATED', { localId: id, status: status.toUpperCase() });
             } catch (error) {
                 console.error('Failed to update todo status:', error);
                 throw error;
@@ -109,6 +117,12 @@ export const todoService = {
                     'UPDATE todos SET title = $1, description = $2, assignee = $3, due_date = $4, priority = $5, status = $6 WHERE id = $7',
                     params
                 );
+                await enqueueSync('TODO_UPDATED', {
+                    localId: todo.id, title: todo.title, description: todo.description,
+                    assignee: todo.assignee, dueDate: todo.due_date,
+                    priority: (todo.priority || 'normal').toUpperCase(),
+                    status: (todo.status || 'todo').toUpperCase(),
+                });
             } catch (error) {
                 console.error('Failed to update todo:', error);
                 throw error;
@@ -130,6 +144,7 @@ export const todoService = {
             if (!db) return;
             try {
                 await db.execute('DELETE FROM todos WHERE id = $1', [id]);
+                await enqueueSync('TODO_DELETED', { localId: id });
             } catch (error) {
                 console.error('Failed to delete todo:', error);
                 throw error;
@@ -223,6 +238,7 @@ export const todoService = {
                     'INSERT INTO tags (id, name, color) VALUES ($1, $2, $3)',
                     [tag.id, tag.name, tag.color]
                 );
+                await enqueueSync('TAG_CREATED', { localId: tag.id, name: tag.name, color: tag.color });
             } catch (error) {
                 console.error('Failed to add tag:', error);
                 throw error;
@@ -243,6 +259,7 @@ export const todoService = {
                     'UPDATE tags SET name = $1, color = $2 WHERE id = $3',
                     [tag.name, tag.color, tag.id]
                 );
+                await enqueueSync('TAG_UPDATED', { localId: tag.id, name: tag.name, color: tag.color });
             } catch (error) {
                 console.error('Failed to update tag:', error);
                 throw error;
@@ -263,6 +280,7 @@ export const todoService = {
             if (!db) return;
             try {
                 await db.execute('DELETE FROM tags WHERE id = $1', [id]);
+                await enqueueSync('TAG_DELETED', { localId: id });
             } catch (error) {
                 console.error('Failed to delete tag:', error);
                 throw error;

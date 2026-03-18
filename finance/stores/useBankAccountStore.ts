@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { bankAccountService, BankAccount } from '../services/bankAccountService';
+import { uuidv7 } from '@/utils/uuid';
 
 interface BankAccountStore {
     accounts: BankAccount[];
@@ -28,7 +29,7 @@ export const useBankAccountStore = create<BankAccountStore>((set, get) => ({
     addAccount: async (data) => {
         set({ isLoading: true });
         try {
-            const id = crypto.randomUUID();
+            const id = uuidv7();
             await bankAccountService.create({ id, ...data });
             await get().fetchAccounts();
         } catch (err) {

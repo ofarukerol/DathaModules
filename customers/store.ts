@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Customer, CustomerSegment, CustomerNote, SpecialOffer, SpecialOfferType, NonPayableReason } from './types';
+import { uuidv7 } from '@/utils/uuid';
 
 export type { Customer, CustomerSegment, CustomerNote, SpecialOffer, SpecialOfferType, NonPayableReason };
 
@@ -305,7 +306,7 @@ export const useCustomerStore = create<CustomerState>()(
                 set((state) => ({
                     customers: [
                         ...state.customers,
-                        { ...customer, id: crypto.randomUUID() },
+                        { ...customer, id: uuidv7() },
                     ],
                 })),
 

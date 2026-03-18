@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { checkNoteService, CheckNote } from '../services/checkNoteService';
+import { uuidv7 } from '@/utils/uuid';
 
 interface CheckNoteStore {
     notes: CheckNote[];
@@ -27,7 +28,7 @@ export const useCheckNoteStore = create<CheckNoteStore>((set, get) => ({
     },
 
     addNote: async (data) => {
-        const id = crypto.randomUUID();
+        const id = uuidv7();
         const newNote: CheckNote = {
             ...data,
             id,

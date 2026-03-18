@@ -11,6 +11,7 @@ import DatePicker from '../../../components/DatePicker';
 import { useProductStore } from '../../products';
 import { useCompanyStore } from '../../../stores/useCompanyStore';
 import { useInvoiceStore } from '../stores/useInvoiceStore';
+import { uuidv7 } from '@/utils/uuid';
 
 interface InvoiceItem {
     id: string;
@@ -163,7 +164,7 @@ const InvoiceForm: React.FC = () => {
         });
 
         // Save to new invoice DB
-        const invoiceId = crypto.randomUUID();
+        const invoiceId = uuidv7();
         try {
             await addInvoice(
                 {
@@ -183,7 +184,7 @@ const InvoiceForm: React.FC = () => {
                     status: 'active',
                 },
                 validItems.map(item => ({
-                    id: crypto.randomUUID(),
+                    id: uuidv7(),
                     product_id: item.productId,
                     name: item.name,
                     quantity: item.quantity,

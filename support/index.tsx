@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useSupportStore } from './store';
 import { toast } from './toastStore';
 import { liveChatApi, liveChatSocket } from './store';
@@ -219,7 +218,6 @@ const cleanSubject = (subject: string) =>
 
 /* ─── Ana Bileşen ─── */
 const Support: React.FC = () => {
-    const navigate = useNavigate();
     const {
         tickets, articles, selectedTicket, isLoading, isArticlesLoading, isDetailLoading,
         fetchTickets, fetchArticles, loadTicketDetail, createTicket, sendMessage, clearSelectedTicket,
@@ -564,7 +562,6 @@ const Support: React.FC = () => {
     }, []);
 
     // Hesaplamalar
-    const openTicketCount = tickets.filter(t => ['OPEN', 'IN_PROGRESS', 'WAITING_CUSTOMER'].includes(t.status)).length;
     const filteredTickets = searchQuery
         ? tickets.filter(t =>
             cleanSubject(t.subject).toLowerCase().includes(searchQuery.toLowerCase()) ||

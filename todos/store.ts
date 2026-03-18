@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { todoService } from './service';
 import { Todo } from './types';
 import { toast } from './toastStore';
+import { uuidv7 } from '@/utils/uuid';
 
 // Safe toast wrapper - never let toast errors break store operations
 const safeToast = {
@@ -36,7 +37,7 @@ export const useTodoStore = create<TodoState>((set, get) => ({
     },
 
     addTodo: async (todoData) => {
-        const id = crypto.randomUUID();
+        const id = uuidv7();
         const newTodo: Todo = { ...todoData, id, created_at: new Date().toISOString() };
         // Optimistic update
         set((state) => ({ todos: [newTodo, ...state.todos] }));

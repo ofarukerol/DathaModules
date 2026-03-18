@@ -4,7 +4,6 @@ import { todoService } from './service';
 import { Todo, Tag } from './types';
 import AddTodoModal from './components/AddTodoModal';
 import EditTodoModal from './components/EditTodoModal';
-import { useToastStore } from './toastStore';
 import {
     Search,
     Plus,
