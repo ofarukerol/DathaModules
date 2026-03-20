@@ -162,7 +162,7 @@ export default function SummaryContent(props: SummaryContentProps) {
                 {/* Üst Bölüm: Canlı Ciro ve Görevlerim */}
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                     {/* Canlı Ciro */}
-                    <div className="bg-white rounded-2xl p-4 flex flex-col shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] border border-gray-100 min-h-[331px] xl:col-span-2">
+                    <div className="bg-white rounded-2xl p-4 flex flex-col shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] border border-gray-100 xl:col-span-2">
                         {/* Başlık + Saat aralığı */}
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-3 gap-2">
                             <div>
@@ -211,7 +211,7 @@ export default function SummaryContent(props: SummaryContentProps) {
                     </div>
 
                     {/* Görevlerim */}
-                    <div className="bg-white rounded-2xl p-4 flex flex-col shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] border border-gray-100 h-[331px]">
+                    <div className="bg-white rounded-2xl p-4 flex flex-col shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] border border-gray-100">
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-3 shrink-0 min-h-[40px] gap-2">
                             <div className="flex items-center gap-2">
                                 <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#663259]/10 to-[#8E44AD]/10 flex items-center justify-center text-[#663259]">
