@@ -49,6 +49,19 @@ export interface Customer {
     isStarred?: boolean;
     loyaltyPoints?: number;
     specialOffers?: SpecialOffer[];
+    addresses?: CustomerAddress[];
+}
+
+export interface CustomerAddress {
+    id: string;
+    label?: string;
+    mahalle?: string;
+    addressLine1?: string;
+    addressLine2?: string;
+    il?: string;
+    ilce?: string;
+    directions?: string;
+    isDefault?: boolean;
 }
 
 export interface NonPayableReason {
