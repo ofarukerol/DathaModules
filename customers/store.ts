@@ -181,6 +181,7 @@ const DEMO_CUSTOMERS: Customer[] = [
     },
 ];
 
+// @ts-expect-error reserved for future seeding
 const SAMPLE_CUSTOMERS: Customer[] = [
     {
         id: 'sample-c1',
