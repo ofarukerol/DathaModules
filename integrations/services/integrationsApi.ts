@@ -73,6 +73,48 @@ export interface TestConnectionResult {
     error?: string;
 }
 
+// ---------------- Phase 4: Product mapping ----------------
+
+export interface IntegrationProductMapDto {
+    id: string;
+    internalProductId: string;
+    externalProductId: string;
+    externalSku: string | null;
+    externalName: string | null;
+    lastPushedPrice: string | null; // Prisma Decimal serialized
+    lastPushedStock: number | null;
+    lastPushedAt: string | null;
+    pushStatus: 'PENDING' | 'SUCCESS' | 'FAILED';
+    lastError: string | null;
+    product?: {
+        id: string;
+        name: string;
+        price: string;
+        stockQty: number;
+        integrationCode: string | null;
+    };
+}
+
+export interface UnmappedProductDto {
+    id: string;
+    name: string;
+    price: string;
+    stockQty: number;
+    integrationCode: string | null;
+}
+
+export interface ProductMapsResponse {
+    mapped: IntegrationProductMapDto[];
+    unmapped: UnmappedProductDto[];
+}
+
+export interface AutoMapResult {
+    success: boolean;
+    created: number;
+    totalTrendyol?: number;
+    error?: string;
+}
+
 export const integrationsApi = {
     async list(): Promise<IntegrationDto[]> {
         const { data } = await api.get<IntegrationDto[]>('/integrations');
@@ -100,6 +142,41 @@ export const integrationsApi = {
 
     async test(id: string): Promise<TestConnectionResult> {
         const { data } = await api.post<TestConnectionResult>(`/integrations/${id}/test`);
+        return data;
+    },
+
+    // Product mapping (Phase 4)
+    async listProductMaps(id: string): Promise<ProductMapsResponse> {
+        const { data } = await api.get<ProductMapsResponse>(`/integrations/${id}/products`);
+        return data;
+    },
+
+    async autoMapProducts(id: string): Promise<AutoMapResult> {
+        const { data } = await api.post<AutoMapResult>(`/integrations/${id}/products/auto-map`);
+        return data;
+    },
+
+    async mapProduct(
+        integrationId: string,
+        internalProductId: string,
+        externalProductId: string,
+        opts?: { externalSku?: string; externalName?: string },
+    ): Promise<IntegrationProductMapDto> {
+        const { data } = await api.post<IntegrationProductMapDto>(
+            `/integrations/${integrationId}/products/${internalProductId}/map`,
+            { externalProductId, ...opts },
+        );
+        return data;
+    },
+
+    async unmapProduct(integrationId: string, internalProductId: string): Promise<void> {
+        await api.delete(`/integrations/${integrationId}/products/${internalProductId}/map`);
+    },
+
+    async pushAllPrices(id: string): Promise<{ queued: number }> {
+        const { data } = await api.post<{ queued: number }>(
+            `/integrations/${id}/sync/push-all-prices`,
+        );
         return data;
     },
 };

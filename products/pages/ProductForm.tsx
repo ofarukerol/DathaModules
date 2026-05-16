@@ -358,6 +358,16 @@ const ProductForm: React.FC = () => {
                                                 </div>
                                             </div>
 
+                                            {/* DAT-236 Phase 4: Trendyol fiyat sync için ürün eşleştirme uyarısı */}
+                                            {mp.key === 'trendyol' && (
+                                                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 flex items-start gap-2">
+                                                    <span className="material-symbols-outlined text-amber-600 text-[18px] mt-0.5">info</span>
+                                                    <p className="text-[11px] text-amber-800 leading-snug">
+                                                        Bu fiyat Trendyol'a otomatik gönderilebilir — önce <strong>Ayarlar &gt; Entegrasyonlar &gt; Trendyol Yemek &gt; Ürün Eşleştirme</strong> sekmesinde bu ürünü Trendyol barcode'una eşleştirin. Eşleşmemiş ürünlerin fiyat değişikliği push edilmez.
+                                                    </p>
+                                                </div>
+                                            )}
+
                                             {/* Sale Price */}
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
