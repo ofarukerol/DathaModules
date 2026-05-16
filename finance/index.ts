@@ -13,6 +13,14 @@ export { default as IncomeExpense } from './pages/IncomeExpense';
 export { default as FinanceCategories } from './pages/FinanceCategories';
 export { default as Marketplaces } from './pages/Marketplaces';
 export { default as OrderDetail } from './pages/OrderDetail';
+export { default as EBelgeler } from './pages/EBelgeler';
+
+// ─── E-Fatura UI (DAT-213) ───
+export { default as EFaturaCaptureSection, emptyEFaturaState } from './components/EFaturaCaptureSection';
+export type { EFaturaCaptureState } from './components/EFaturaCaptureSection';
+export { default as EFaturaCaptureModal } from './components/EFaturaCaptureModal';
+export { useEFaturaCapture } from './hooks/useEFaturaCapture';
+export { efaturaService } from './services/efaturaService';
 
 // ─── Stores ───
 export { useBankStore } from './stores/useBankStore';
