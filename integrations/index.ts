@@ -5,6 +5,7 @@
 export { default as IntegrationsList } from './pages/IntegrationsList';
 export { default as TrendyolFoodSetup } from './pages/TrendyolFoodSetup';
 export { default as TrendyolFoodDetail } from './pages/TrendyolFoodDetail';
+export { default as WhatsAppSetup } from './pages/WhatsAppSetup';
 
 // ─── Stores ───
 export { useIntegrationStore } from './stores/useIntegrationStore';

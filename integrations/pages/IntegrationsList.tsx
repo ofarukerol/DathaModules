@@ -34,6 +34,7 @@ const SETUP_ROUTE_BY_PROVIDER: Record<IntegrationProvider, string> = {
     YEMEKSEPETI: '/finance/marketplaces/new?provider=YEMEKSEPETI',
     GETIR_FOOD: '/finance/marketplaces/new?provider=GETIR_FOOD',
     MIGROS_YEMEK: '/finance/marketplaces/new?provider=MIGROS_YEMEK',
+    WHATSAPP: '/finance/marketplaces/whatsapp-setup',
 };
 
 export default function IntegrationsList() {
