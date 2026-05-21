@@ -1,14 +1,20 @@
 // status: 'todo' | 'in_progress' | 'done'
 // priority: 'low' | 'normal' | 'high' | 'urgent'
+export interface TodoAssignee {
+    id: string;        // User.id
+    name: string | null;
+}
+
 export interface Todo {
     id: string;
     title: string;
     description: string;
-    assignee: string;
+    assignees: TodoAssignee[];   // coklu atama (backend kaynak)
     due_date?: string;
     priority?: 'low' | 'normal' | 'high' | 'urgent';
     status: 'todo' | 'in_progress' | 'done';
     created_at?: string;
+    createdBy?: string | null;
 }
 
 export interface Tag {

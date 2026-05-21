@@ -5,6 +5,7 @@ import { Todo, Tag } from './types';
 import AddTodoModal from './components/AddTodoModal';
 import EditTodoModal from './components/EditTodoModal';
 import { useToastStore } from './toastStore';
+import { useAuthStore } from '@/stores/useAuthStore';
 import {
     Search,
     Plus,
@@ -49,6 +50,14 @@ interface TodoBoardProps {
 
 const TodoBoard: React.FC<TodoBoardProps> = ({ currentUserName, getUsersFn }) => {
     const { todos, fetchTodos, updateStatus, deleteTodo } = useTodoStore();
+
+    // Baskasina gorev atama yetkisi (UX gate — backend ayrica enforce eder)
+    const userRole = useAuthStore((s) => s.user?.role);
+    const permissions = useAuthStore((s) => s.permissions);
+    const canAssign =
+        permissions.includes('all') ||
+        permissions.includes('tasks.assign_to_other') ||
+        ['OWNER', 'MANAGER', 'admin'].includes(userRole ?? '');
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -407,11 +416,23 @@ const TodoBoard: React.FC<TodoBoardProps> = ({ currentUserName, getUsersFn }) =>
                                                     </div>
 
                                                     <div className="flex -space-x-2">
-                                                        <img
-                                                            src={`https://i.pravatar.cc/100?u=${task.assignee || task.id}`}
-                                                            alt="User"
-                                                            className="w-6 h-6 rounded-full border-2 border-white object-cover shadow-sm bg-gray-100"
-                                                        />
+                                                        {(task.assignees && task.assignees.length > 0
+                                                            ? task.assignees.slice(0, 3)
+                                                            : [{ id: task.id, name: null }]
+                                                        ).map((a) => (
+                                                            <img
+                                                                key={a.id}
+                                                                src={`https://i.pravatar.cc/100?u=${a.id}`}
+                                                                alt={a.name ?? 'User'}
+                                                                title={a.name ?? undefined}
+                                                                className="w-6 h-6 rounded-full border-2 border-white object-cover shadow-sm bg-gray-100"
+                                                            />
+                                                        ))}
+                                                        {task.assignees && task.assignees.length > 3 && (
+                                                            <div className="w-6 h-6 rounded-full border-2 border-white bg-gray-200 text-gray-600 text-[9px] font-bold flex items-center justify-center shadow-sm">
+                                                                +{task.assignees.length - 3}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
@@ -525,10 +546,12 @@ const TodoBoard: React.FC<TodoBoardProps> = ({ currentUserName, getUsersFn }) =>
                                             {task.description && (
                                                 <p className="text-xs text-gray-400 truncate mt-0.5">{task.description}</p>
                                             )}
-                                            {task.assignee && (
+                                            {task.assignees && task.assignees.length > 0 && (
                                                 <div className="flex items-center gap-1 mt-1">
                                                     <User size={10} className="text-gray-300" />
-                                                    <span className="text-[10px] text-gray-400 font-medium">{task.assignee}</span>
+                                                    <span className="text-[10px] text-gray-400 font-medium">
+                                                        {task.assignees.map((a) => a.name).filter(Boolean).join(', ')}
+                                                    </span>
                                                 </div>
                                             )}
                                         </div>
@@ -587,6 +610,7 @@ const TodoBoard: React.FC<TodoBoardProps> = ({ currentUserName, getUsersFn }) =>
                     isOpen={isAddModalOpen}
                     onClose={() => { setIsAddModalOpen(false); loadTodoTags(todos); }}
                     getUsersFn={getUsersFn}
+                    canAssign={canAssign}
                 />
             )}
 
@@ -597,6 +621,7 @@ const TodoBoard: React.FC<TodoBoardProps> = ({ currentUserName, getUsersFn }) =>
                     todo={editingTodo}
                     currentUserName={currentUserName}
                     getUsersFn={getUsersFn}
+                    canAssign={canAssign}
                 />
             )}
         </div>

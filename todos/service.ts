@@ -1,9 +1,64 @@
 import { getReadyDb, isTauri } from './db';
 import { Todo, Tag, TodoComment } from './types';
+import { api } from '../_shared/api';
 
-// ─── localStorage helpers (browser fallback) ───
+// ─── Backend <-> UI eslestirme ───
+type ApiStatus = 'TODO' | 'IN_PROGRESS' | 'DONE';
+type ApiPriority = 'URGENT' | 'HIGH' | 'NORMAL' | 'LOW';
+type UiStatus = 'todo' | 'in_progress' | 'done';
+type UiPriority = 'low' | 'normal' | 'high' | 'urgent';
 
-const LS_TODOS_KEY = 'datha_todos';
+interface ApiTodo {
+    id: string;
+    title: string;
+    description: string | null;
+    status: ApiStatus;
+    priority: ApiPriority;
+    dueDate: string | null;
+    createdBy: string | null;
+    createdAt: string;
+    assignees: { id: string; name: string | null }[];
+}
+
+const STATUS_TO_API: Record<UiStatus, ApiStatus> = {
+    todo: 'TODO',
+    in_progress: 'IN_PROGRESS',
+    done: 'DONE',
+};
+const STATUS_FROM_API: Record<ApiStatus, UiStatus> = {
+    TODO: 'todo',
+    IN_PROGRESS: 'in_progress',
+    DONE: 'done',
+};
+const PRIORITY_TO_API: Record<UiPriority, ApiPriority> = {
+    low: 'LOW',
+    normal: 'NORMAL',
+    high: 'HIGH',
+    urgent: 'URGENT',
+};
+const PRIORITY_FROM_API: Record<ApiPriority, UiPriority> = {
+    LOW: 'low',
+    NORMAL: 'normal',
+    HIGH: 'high',
+    URGENT: 'urgent',
+};
+
+function mapFromApi(t: ApiTodo): Todo {
+    return {
+        id: t.id,
+        title: t.title,
+        description: t.description ?? '',
+        assignees: t.assignees ?? [],
+        due_date: t.dueDate ?? undefined,
+        priority: PRIORITY_FROM_API[t.priority] ?? 'normal',
+        status: STATUS_FROM_API[t.status] ?? 'todo',
+        created_at: t.createdAt,
+        createdBy: t.createdBy ?? null,
+    };
+}
+
+// ─── localStorage helpers (etiket/yorum — backend'de henuz endpoint yok) ───
+
 const LS_TAGS_KEY = 'datha_tags';
 const LS_COMMENTS_KEY = 'datha_todo_comments';
 const LS_TODO_TAGS_KEY = 'datha_todo_tags';
@@ -17,129 +72,54 @@ function lsGet<T>(key: string, fallback: T): T {
     }
 }
 
-function lsSet(key: string, value: any) {
+function lsSet(key: string, value: unknown) {
     localStorage.setItem(key, JSON.stringify(value));
 }
 
 // ─── Service ───
 
 export const todoService = {
+    // ===== Gorevler (backend kaynak) =====
+
     async getTodos(): Promise<Todo[]> {
-        if (isTauri()) {
-            const db = await getReadyDb();
-            if (!db) return [];
-            try {
-                return await db.select<Todo[]>('SELECT * FROM todos ORDER BY created_at DESC');
-            } catch (error) {
-                console.error('Failed to fetch todos:', error);
-                return [];
-            }
-        }
-        // Browser fallback
-        return lsGet<Todo[]>(LS_TODOS_KEY, []);
+        const { data } = await api.get<{ success: boolean; data: ApiTodo[] }>('/todos');
+        return (data.data ?? []).map(mapFromApi);
     },
 
-    async addTodo(todo: Todo) {
-        if (isTauri()) {
-            const db = await getReadyDb();
-            if (!db) return;
-            try {
-                const params = [
-                    todo.id,
-                    todo.title || '',
-                    todo.description || '',
-                    todo.assignee || '',
-                    todo.due_date || null,
-                    todo.priority || 'normal',
-                    todo.status || 'todo',
-                    todo.created_at || new Date().toISOString(),
-                ];
-                await db.execute(
-                    'INSERT INTO todos (id, title, description, assignee, due_date, priority, status, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-                    params
-                );
-            } catch (error) {
-                console.error('Failed to add todo:', error);
-                throw error;
-            }
-            return;
-        }
-        // Browser fallback
-        const todos = lsGet<Todo[]>(LS_TODOS_KEY, []);
-        todos.unshift(todo);
-        lsSet(LS_TODOS_KEY, todos);
+    /** Gorev olustur + (coklu) ata. Backend'in olusturdugu kaydi dondurur. */
+    async addTodo(todo: Omit<Todo, 'id' | 'created_at'>): Promise<Todo> {
+        const { data } = await api.post<{ success: boolean; data: ApiTodo }>('/todos', {
+            title: todo.title,
+            description: todo.description || undefined,
+            priority: PRIORITY_TO_API[todo.priority ?? 'normal'],
+            status: STATUS_TO_API[todo.status ?? 'todo'],
+            dueDate: todo.due_date || undefined,
+            assigneeIds: (todo.assignees ?? []).map((a) => a.id),
+        });
+        return mapFromApi(data.data);
     },
 
-    async updateTodoStatus(id: string, status: string) {
-        if (isTauri()) {
-            const db = await getReadyDb();
-            if (!db) return;
-            try {
-                await db.execute('UPDATE todos SET status = $1 WHERE id = $2', [status, id]);
-            } catch (error) {
-                console.error('Failed to update todo status:', error);
-                throw error;
-            }
-            return;
-        }
-        // Browser fallback
-        const todos = lsGet<Todo[]>(LS_TODOS_KEY, []);
-        const idx = todos.findIndex((t) => t.id === id);
-        if (idx >= 0) {
-            todos[idx].status = status as Todo['status'];
-            lsSet(LS_TODOS_KEY, todos);
-        }
+    async updateTodoStatus(id: string, status: UiStatus): Promise<void> {
+        await api.patch(`/todos/${id}/status`, { status: STATUS_TO_API[status] });
     },
 
-    async updateTodo(todo: Todo) {
-        if (isTauri()) {
-            const db = await getReadyDb();
-            if (!db) return;
-            try {
-                const params = [
-                    todo.title || '',
-                    todo.description || '',
-                    todo.assignee || '',
-                    todo.due_date || null,
-                    todo.priority || 'normal',
-                    todo.status || 'todo',
-                    todo.id,
-                ];
-                await db.execute(
-                    'UPDATE todos SET title = $1, description = $2, assignee = $3, due_date = $4, priority = $5, status = $6 WHERE id = $7',
-                    params
-                );
-            } catch (error) {
-                console.error('Failed to update todo:', error);
-                throw error;
-            }
-            return;
-        }
-        // Browser fallback
-        const todos = lsGet<Todo[]>(LS_TODOS_KEY, []);
-        const idx = todos.findIndex((t) => t.id === todo.id);
-        if (idx >= 0) {
-            todos[idx] = todo;
-            lsSet(LS_TODOS_KEY, todos);
-        }
+    async updateTodo(todo: Todo): Promise<Todo> {
+        const { data } = await api.patch<{ success: boolean; data: ApiTodo }>(`/todos/${todo.id}`, {
+            title: todo.title,
+            description: todo.description || undefined,
+            priority: PRIORITY_TO_API[todo.priority ?? 'normal'],
+            status: STATUS_TO_API[todo.status ?? 'todo'],
+            dueDate: todo.due_date ?? null,
+            assigneeIds: (todo.assignees ?? []).map((a) => a.id),
+        });
+        return mapFromApi(data.data);
     },
 
-    async deleteTodo(id: string) {
-        if (isTauri()) {
-            const db = await getReadyDb();
-            if (!db) return;
-            try {
-                await db.execute('DELETE FROM todos WHERE id = $1', [id]);
-            } catch (error) {
-                console.error('Failed to delete todo:', error);
-                throw error;
-            }
-            return;
-        }
-        // Browser fallback
-        const todos = lsGet<Todo[]>(LS_TODOS_KEY, []);
-        lsSet(LS_TODOS_KEY, todos.filter((t) => t.id !== id));
+    async deleteTodo(id: string): Promise<void> {
+        await api.delete(`/todos/${id}`);
     },
+
+    // ===== Yorumlar (yerel — localStorage / Tauri SQLite) =====
 
     async getComments(todoId: string): Promise<TodoComment[]> {
         if (isTauri()) {
@@ -148,14 +128,13 @@ export const todoService = {
             try {
                 return await db.select<TodoComment[]>(
                     'SELECT * FROM todo_comments WHERE todo_id = $1 ORDER BY created_at ASC',
-                    [todoId]
+                    [todoId],
                 );
             } catch (error) {
                 console.error('Failed to fetch comments:', error);
                 return [];
             }
         }
-        // Browser fallback
         const all = lsGet<TodoComment[]>(LS_COMMENTS_KEY, []);
         return all.filter((c) => c.todo_id === todoId);
     },
@@ -167,7 +146,7 @@ export const todoService = {
             try {
                 await db.execute(
                     'INSERT INTO todo_comments (id, todo_id, author, content, created_at) VALUES ($1, $2, $3, $4, $5)',
-                    [comment.id, comment.todo_id, comment.author, comment.content, new Date().toISOString()]
+                    [comment.id, comment.todo_id, comment.author, comment.content, new Date().toISOString()],
                 );
             } catch (error) {
                 console.error('Failed to add comment:', error);
@@ -175,7 +154,6 @@ export const todoService = {
             }
             return;
         }
-        // Browser fallback
         const all = lsGet<TodoComment[]>(LS_COMMENTS_KEY, []);
         all.push({ ...comment, created_at: new Date().toISOString() });
         lsSet(LS_COMMENTS_KEY, all);
@@ -193,12 +171,11 @@ export const todoService = {
             }
             return;
         }
-        // Browser fallback
         const all = lsGet<TodoComment[]>(LS_COMMENTS_KEY, []);
         lsSet(LS_COMMENTS_KEY, all.filter((c) => c.id !== id));
     },
 
-    // --- Tag Methods ---
+    // ===== Etiketler (yerel) =====
 
     async getTags(): Promise<Tag[]> {
         if (isTauri()) {
@@ -219,10 +196,11 @@ export const todoService = {
             const db = await getReadyDb();
             if (!db) return;
             try {
-                await db.execute(
-                    'INSERT INTO tags (id, name, color) VALUES ($1, $2, $3)',
-                    [tag.id, tag.name, tag.color]
-                );
+                await db.execute('INSERT INTO tags (id, name, color) VALUES ($1, $2, $3)', [
+                    tag.id,
+                    tag.name,
+                    tag.color,
+                ]);
             } catch (error) {
                 console.error('Failed to add tag:', error);
                 throw error;
@@ -239,10 +217,11 @@ export const todoService = {
             const db = await getReadyDb();
             if (!db) return;
             try {
-                await db.execute(
-                    'UPDATE tags SET name = $1, color = $2 WHERE id = $3',
-                    [tag.name, tag.color, tag.id]
-                );
+                await db.execute('UPDATE tags SET name = $1, color = $2 WHERE id = $3', [
+                    tag.name,
+                    tag.color,
+                    tag.id,
+                ]);
             } catch (error) {
                 console.error('Failed to update tag:', error);
                 throw error;
@@ -280,7 +259,7 @@ export const todoService = {
             try {
                 return await db.select<Tag[]>(
                     'SELECT t.* FROM tags t INNER JOIN todo_tags tt ON t.id = tt.tag_id WHERE tt.todo_id = $1',
-                    [todoId]
+                    [todoId],
                 );
             } catch (error) {
                 console.error('Failed to fetch tags for todo:', error);
@@ -300,10 +279,10 @@ export const todoService = {
             try {
                 await db.execute('DELETE FROM todo_tags WHERE todo_id = $1', [todoId]);
                 for (const tagId of tagIds) {
-                    await db.execute(
-                        'INSERT INTO todo_tags (todo_id, tag_id) VALUES ($1, $2)',
-                        [todoId, tagId]
-                    );
+                    await db.execute('INSERT INTO todo_tags (todo_id, tag_id) VALUES ($1, $2)', [
+                        todoId,
+                        tagId,
+                    ]);
                 }
             } catch (error) {
                 console.error('Failed to set tags for todo:', error);

@@ -36,21 +36,17 @@ export const useTodoStore = create<TodoState>((set, get) => ({
     },
 
     addTodo: async (todoData) => {
-        const id = crypto.randomUUID();
-        const newTodo: Todo = { ...todoData, id, created_at: new Date().toISOString() };
-        // Optimistic update
-        set((state) => ({ todos: [newTodo, ...state.todos] }));
         try {
-            await todoService.addTodo(newTodo);
+            // Backend kaydi olusturur (id + atananlar) ve geri doner
+            const created = await todoService.addTodo(todoData);
+            set((state) => ({ todos: [created, ...state.todos] }));
             safeToast.success('Görev eklendi');
+            return created.id;
         } catch (err: any) {
-            set((state) => ({
-                error: err.message,
-                todos: state.todos.filter((t) => t.id !== id),
-            }));
+            set({ error: err.message });
             safeToast.error('Görev eklenemedi');
+            return '';
         }
-        return id;
     },
 
     updateStatus: async (id, status) => {
@@ -78,7 +74,11 @@ export const useTodoStore = create<TodoState>((set, get) => ({
             todos: state.todos.map((t) => (t.id === updatedTodo.id ? updatedTodo : t)),
         }));
         try {
-            await todoService.updateTodo(updatedTodo);
+            const saved = await todoService.updateTodo(updatedTodo);
+            // Sunucu gerceği (atananlar dahil) ile guncelle
+            set((state) => ({
+                todos: state.todos.map((t) => (t.id === saved.id ? saved : t)),
+            }));
             safeToast.success('Görev güncellendi');
         } catch (err: any) {
             set({ error: err.message, todos: oldTodos });
