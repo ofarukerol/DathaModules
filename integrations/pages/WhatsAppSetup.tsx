@@ -11,7 +11,7 @@
 // externalStoreId=WABA ID, token=access_token, config={appSecret, verifyToken, webhookUrl} }
 // apiKey/apiSecret boş gönderilir (WhatsApp'ta kullanılmaz).
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import GradientHeader from '../../../components/GradientHeader';
 import { useIntegrationStore } from '../stores/useIntegrationStore';
@@ -20,7 +20,8 @@ import {
     PROVIDER_LABELS,
     PROVIDER_COLORS,
 } from '../../../shared/src';
-import type { IntegrationDto } from '../services/integrationsApi';
+import type { IntegrationDto, BranchOption } from '../services/integrationsApi';
+import { tenantApi } from '../services/integrationsApi';
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -49,6 +50,12 @@ export default function WhatsAppSetup() {
 
     const [minOrderAmount, setMinOrderAmount] = useState(50);
     const [askPaymentMethod, setAskPaymentMethod] = useState(true);
+    const [defaultBranchId, setDefaultBranchId] = useState<string>('');
+    const [branches, setBranches] = useState<BranchOption[]>([]);
+
+    useEffect(() => {
+        tenantApi.getBranches().then(setBranches).catch(() => {});
+    }, []);
 
     const verifyToken = useMemo(() => generateVerifyToken(), []);
 
@@ -84,6 +91,9 @@ export default function WhatsAppSetup() {
                 },
             });
             setCreatedIntegration(created);
+            if (defaultBranchId) {
+                await tenantApi.updateWhatsappDefaultBranch(defaultBranchId);
+            }
             setStep(4);
         } catch (err: unknown) {
             const apiError = err as { response?: { data?: { message?: string } }; message?: string };
@@ -255,6 +265,26 @@ export default function WhatsAppSetup() {
                                     </div>
                                     <p className="text-xs text-gray-400">Varsayılan: 50₺ · 0 girersen limit uygulanmaz</p>
                                 </div>
+
+                                {/* Varsayılan Şube */}
+                                {branches.length > 1 && (
+                                    <div className="flex flex-col gap-1.5">
+                                        <label className="font-bold text-sm">Varsayılan Şube</label>
+                                        <select
+                                            value={defaultBranchId}
+                                            onChange={(e) => setDefaultBranchId(e.target.value)}
+                                            className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-[#663259] focus:ring-1 focus:ring-[#663259] bg-white"
+                                        >
+                                            <option value="">Otomatik (ana şube → ilk aktif)</option>
+                                            {branches.map((b) => (
+                                                <option key={b.id} value={b.id}>
+                                                    {b.name}{b.isMainBranch ? ' (Ana Şube)' : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <p className="text-xs text-gray-400">WhatsApp siparişlerinin düşeceği şube. Seçilmezse ana şube kullanılır.</p>
+                                    </div>
+                                )}
 
                                 {/* Ödeme Yöntemi Sor */}
                                 <div className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3.5">

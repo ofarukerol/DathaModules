@@ -115,6 +115,24 @@ export interface AutoMapResult {
     error?: string;
 }
 
+export interface BranchOption {
+    id: string;
+    name: string;
+    isMainBranch: boolean;
+    code: string | null;
+}
+
+export const tenantApi = {
+    async getBranches(): Promise<BranchOption[]> {
+        const { data } = await api.get<{ success: boolean; data: BranchOption[] }>('/tenant/me/branches');
+        return data.data;
+    },
+
+    async updateWhatsappDefaultBranch(branchId: string | null): Promise<void> {
+        await api.patch('/tenant/me', { whatsappDefaultBranchId: branchId });
+    },
+};
+
 export const integrationsApi = {
     async list(): Promise<IntegrationDto[]> {
         const { data } = await api.get<IntegrationDto[]>('/integrations');
