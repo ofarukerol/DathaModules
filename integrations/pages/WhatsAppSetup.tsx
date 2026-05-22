@@ -22,7 +22,7 @@ import {
 } from '../../../shared/src';
 import type { IntegrationDto } from '../services/integrationsApi';
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3 | 4 | 5;
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) || 'http://localhost:3000/api';
 const WEBHOOK_URL = `${API_BASE_URL}/webhooks/whatsapp`;
@@ -46,6 +46,9 @@ export default function WhatsAppSetup() {
     const [phoneNumberId, setPhoneNumberId] = useState('');
     const [accessToken, setAccessToken] = useState('');
     const [appSecret, setAppSecret] = useState('');
+
+    const [minOrderAmount, setMinOrderAmount] = useState(50);
+    const [askPaymentMethod, setAskPaymentMethod] = useState(true);
 
     const verifyToken = useMemo(() => generateVerifyToken(), []);
 
@@ -76,10 +79,12 @@ export default function WhatsAppSetup() {
                     appSecret: appSecret.trim(),
                     verifyToken,
                     webhookUrl: WEBHOOK_URL,
+                    minOrderAmount,
+                    askPaymentMethod,
                 },
             });
             setCreatedIntegration(created);
-            setStep(3);
+            setStep(4);
         } catch (err: unknown) {
             const apiError = err as { response?: { data?: { message?: string } }; message?: string };
             setFormError(apiError.response?.data?.message || apiError.message || 'Entegrasyon kaydedilemedi');
@@ -94,7 +99,7 @@ export default function WhatsAppSetup() {
                 <GradientHeader
                     icon="chat"
                     title={`${PROVIDER_LABELS[IntegrationProvider.WHATSAPP]} Entegrasyonu`}
-                    subtitle={`Adım ${step} / 4`}
+                    subtitle={`Adım ${step} / 5`}
                 />
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -108,7 +113,7 @@ export default function WhatsAppSetup() {
                                 {providerColors.logo}
                             </div>
                             <div className="flex gap-1.5">
-                                {[1, 2, 3, 4].map((s) => (
+                                {[1, 2, 3, 4, 5].map((s) => (
                                     <div
                                         key={s}
                                         className={`w-8 h-1.5 rounded-full ${
@@ -203,10 +208,6 @@ export default function WhatsAppSetup() {
                                     helper="Meta App → Settings → Basic → App Secret (webhook imza doğrulama için)"
                                 />
 
-                                {formError && (
-                                    <p className="text-sm text-red-600">{formError}</p>
-                                )}
-
                                 <div className="flex justify-between mt-4">
                                     <button
                                         onClick={() => setStep(1)}
@@ -215,8 +216,83 @@ export default function WhatsAppSetup() {
                                         ← Geri
                                     </button>
                                     <button
+                                        onClick={() => setStep(3)}
+                                        disabled={!isFormValid}
+                                        className="px-5 py-2.5 rounded-xl bg-[#663259] text-white font-bold text-sm hover:shadow-lg hover:shadow-[#663259]/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Devam Et →
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Step 3: Bot Ayarları */}
+                        {step === 3 && (
+                            <div className="flex flex-col gap-5">
+                                <h2 className="text-xl font-bold text-gray-800">Bot Ayarları</h2>
+                                <p className="text-sm text-gray-600 leading-relaxed">
+                                    Botun sipariş alma davranışını özelleştirin. Bu ayarlar daha sonra
+                                    entegrasyon detayından değiştirilebilir.
+                                </p>
+
+                                {/* Min Sipariş Tutarı */}
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="font-bold text-sm">
+                                        Minimum Sipariş Tutarı (₺)
+                                    </label>
+                                    <div className="flex items-center gap-3">
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            step={5}
+                                            value={minOrderAmount}
+                                            onChange={(e) => setMinOrderAmount(Math.max(0, Number(e.target.value)))}
+                                            className="w-32 rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-[#663259] focus:ring-1 focus:ring-[#663259]"
+                                        />
+                                        <span className="text-sm text-gray-500">
+                                            Bu tutarın altındaki siparişler kabul edilmez.
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-gray-400">Varsayılan: 50₺ · 0 girersen limit uygulanmaz</p>
+                                </div>
+
+                                {/* Ödeme Yöntemi Sor */}
+                                <div className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3.5">
+                                    <div>
+                                        <p className="font-bold text-sm text-gray-800">Ödeme Yöntemi Sor</p>
+                                        <p className="text-xs text-gray-500 mt-0.5">
+                                            Aktifken bot sipariş onayından önce ödeme yöntemini (Nakit / Kart / Yemek Kartı) sorar.
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setAskPaymentMethod(!askPaymentMethod)}
+                                        className={`relative w-11 h-6 rounded-full transition-colors ${
+                                            askPaymentMethod ? 'bg-[#663259]' : 'bg-gray-200'
+                                        }`}
+                                    >
+                                        <span
+                                            className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                                                askPaymentMethod ? 'translate-x-5' : 'translate-x-0'
+                                            }`}
+                                        />
+                                    </button>
+                                </div>
+
+                                {formError && (
+                                    <p className="text-sm text-red-600">{formError}</p>
+                                )}
+
+                                <div className="flex justify-between mt-2">
+                                    <button
+                                        onClick={() => setStep(2)}
+                                        className="px-5 py-2.5 rounded-xl bg-gray-100 text-gray-700 font-bold text-sm hover:bg-gray-200"
+                                    >
+                                        ← Geri
+                                    </button>
+                                    <button
                                         onClick={handleSubmit}
-                                        disabled={!isFormValid || submitting}
+                                        disabled={submitting}
                                         className="px-5 py-2.5 rounded-xl bg-[#663259] text-white font-bold text-sm hover:shadow-lg hover:shadow-[#663259]/20 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         {submitting ? 'Kaydediliyor...' : 'Kaydet ve Devam Et →'}
@@ -225,8 +301,8 @@ export default function WhatsAppSetup() {
                             </div>
                         )}
 
-                        {/* Step 3: Webhook URL */}
-                        {step === 3 && createdIntegration && (
+                        {/* Step 4: Webhook URL */}
+                        {step === 4 && createdIntegration && (
                             <div className="flex flex-col gap-4">
                                 <h2 className="text-xl font-bold text-gray-800">Meta Webhook Ayarları</h2>
                                 <p className="text-sm text-gray-600 leading-relaxed">
@@ -263,13 +339,13 @@ export default function WhatsAppSetup() {
 
                                 <div className="flex justify-between mt-4">
                                     <button
-                                        onClick={() => setStep(2)}
+                                        onClick={() => setStep(3)}
                                         className="px-5 py-2.5 rounded-xl bg-gray-100 text-gray-700 font-bold text-sm hover:bg-gray-200"
                                     >
                                         ← Düzenle
                                     </button>
                                     <button
-                                        onClick={() => setStep(4)}
+                                        onClick={() => setStep(5)}
                                         className="px-5 py-2.5 rounded-xl bg-[#663259] text-white font-bold text-sm hover:shadow-lg hover:shadow-[#663259]/20"
                                     >
                                         Tamamla →
@@ -278,8 +354,8 @@ export default function WhatsAppSetup() {
                             </div>
                         )}
 
-                        {/* Step 4: Sonuç */}
-                        {step === 4 && createdIntegration && (
+                        {/* Step 5: Sonuç */}
+                        {step === 5 && createdIntegration && (
                             <div className="flex flex-col gap-4">
                                 <h2 className="text-xl font-bold text-gray-800">Kurulum Tamamlandı</h2>
                                 <div
