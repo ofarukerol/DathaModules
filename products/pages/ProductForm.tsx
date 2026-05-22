@@ -11,6 +11,7 @@ const ProductForm: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const { products, categories, addProduct, updateProduct, addCategory } = useProductStore();
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+    const [marketplaceOpen, setMarketplaceOpen] = useState(false);
 
     const isEditMode = Boolean(id);
     const existingProduct = isEditMode ? products.find(p => p.id === id) : null;
@@ -194,6 +195,7 @@ const ProductForm: React.FC = () => {
         };
 
         if (isEditMode && id) {
+            if (!window.confirm('Bu ürünü güncellemek istediğinize emin misiniz?')) return;
             updateProduct(id, productData);
             showSuccess('Ürün başarıyla güncellendi');
         } else {
@@ -295,27 +297,58 @@ const ProductForm: React.FC = () => {
                                 <span className="material-symbols-outlined text-lg">close</span> Vazgeç
                             </button>
                             <button onClick={handleSave} className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-white text-[#663259] hover:bg-white/90 transition-all text-sm font-bold shadow-lg shadow-black/10">
-                                <span className="material-symbols-outlined text-lg">save</span> {isEditMode ? 'Güncellemeleri Kaydet' : 'Ürünü Kaydet'}
+                                <span className="material-symbols-outlined text-lg">save</span> Kaydet
                             </button>
                         </div>
                     </div>
                 </div>
 
                 {/* Main Content */}
-                <div className="flex-1 overflow-hidden flex gap-8 min-h-0">
-                    <div className="w-1/3 flex flex-col gap-4 overflow-y-auto no-scrollbar pb-6">
-                        <div className="bg-white rounded-[32px] border border-gray-100 shadow-soft p-6">
-                            <div className="flex items-center gap-4 mb-6 pb-4 border-b border-slate-50">
+                <div className="flex-1 overflow-hidden flex min-h-0">
+                    {/* Pazaryeri Toggle Butonu (kapalıyken) */}
+                    {!marketplaceOpen && (
+                        <button
+                            type="button"
+                            onClick={() => setMarketplaceOpen(true)}
+                            className="shrink-0 w-14 flex flex-col items-center justify-center gap-3 mr-3 rounded-2xl shadow-lg hover:shadow-xl transition-all group cursor-pointer border border-[#663259]/30 hover:border-[#663259]/50 relative overflow-hidden"
+                            style={{ background: 'linear-gradient(180deg, #663259 0%, #4A235A 50%, #3d1d4b 100%)' }}
+                            title="Pazaryeri Analizi"
+                        >
+                            {/* Dekoratif parlama */}
+                            <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-white/15 to-transparent" />
+                            <div className="absolute -bottom-4 -right-4 w-20 h-20 rounded-full bg-white/5" />
+
+                            <div className="relative w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20 group-hover:bg-white/30 transition-all group-hover:scale-110">
+                                <span className="material-symbols-outlined text-xl text-white">insights</span>
+                            </div>
+                            <span className="relative text-[11px] font-black text-white uppercase tracking-[0.2em] [writing-mode:vertical-lr] rotate-180 drop-shadow-sm">Pazaryeri</span>
+                            <div className="relative flex items-center justify-center w-7 h-7 rounded-lg bg-white/15 group-hover:bg-white/25 transition-all">
+                                <span className="material-symbols-outlined text-sm text-white group-hover:translate-x-0.5 transition-transform">chevron_right</span>
+                            </div>
+                        </button>
+                    )}
+
+                    {/* Pazaryeri Paneli (açıkken) */}
+                    <div className={`flex flex-col gap-4 overflow-y-auto no-scrollbar pb-6 shrink-0 transition-all duration-300 ${marketplaceOpen ? 'w-1/3 opacity-100 mr-8' : 'w-0 opacity-0 overflow-hidden'}`}>
+                        <div className="bg-white rounded-[32px] border border-gray-100 shadow-soft p-6 min-w-[300px]">
+                            <button
+                                type="button"
+                                onClick={() => setMarketplaceOpen(false)}
+                                className="w-full flex items-center gap-4 pb-4 border-b border-slate-50 cursor-pointer group"
+                            >
                                 <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600">
                                     <span className="material-symbols-outlined text-2xl">insights</span>
                                 </div>
-                                <div>
+                                <div className="text-left flex-1">
                                     <h3 className="text-base font-black text-slate-800 tracking-tight">Pazaryeri Analizi</h3>
                                     <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">Komisyon & Kar Marjı</p>
                                 </div>
-                            </div>
+                                <span className="material-symbols-outlined text-xl text-slate-400 group-hover:text-indigo-600 transition-colors">
+                                    chevron_left
+                                </span>
+                            </button>
 
-                            <div className="space-y-6">
+                            <div className="space-y-6 mt-6">
                                 {[
                                     { key: 'getir', name: 'Getir', color: 'bg-[#5D3EBD]', lightBg: 'bg-[#5D3EBD]/5', textColor: 'text-[#5D3EBD]' },
                                     { key: 'yemeksepeti', name: 'Yemeksepeti', color: 'bg-[#EA1D2C]', lightBg: 'bg-[#EA1D2C]/5', textColor: 'text-[#EA1D2C]' },

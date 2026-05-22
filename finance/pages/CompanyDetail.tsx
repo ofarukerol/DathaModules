@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import DatePicker from '../../../components/DatePicker';
 import { useCompanyStore } from '../../../stores/useCompanyStore';
-import PageToolbar from '../../../components/PageToolbar';
+import GradientHeader from '../../../components/GradientHeader';
 
 const CompanyDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -121,32 +121,30 @@ const CompanyDetail: React.FC = () => {
 
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-gray-50">
-            <PageToolbar
-                icon="corporate_fare"
-                title={company.name}
-                stats={company.title}
-                actions={
-                    <>
-                        <button
-                            onClick={() => navigate(`/finance/companies/${id}/invoice/new`)}
-                            className="h-8 flex items-center gap-1.5 px-3.5 rounded-lg text-sm font-semibold text-white transition-all hover:brightness-110"
-                            style={{ background: '#663259' }}
-                        >
-                            <Plus size={16} />
-                            Alış Faturası Ekle
-                        </button>
-                        <button
-                            onClick={() => setShowPaymentModal(true)}
-                            className="h-8 flex items-center gap-1.5 px-3 rounded-lg text-sm font-semibold text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition-all"
-                        >
-                            <CreditCard size={16} />
-                            Ödeme Ekle
-                        </button>
-                    </>
-                }
-            />
+            <div className="flex-1 overflow-hidden p-5 pt-4 flex flex-col gap-4">
+                <GradientHeader
+                    icon="corporate_fare"
+                    title={company.name}
+                    subtitle={company.title}
+                >
+                    <button
+                        onClick={() => navigate(`/finance/companies/${id}/invoice/new`)}
+                        className="h-8 flex items-center gap-1.5 px-3.5 rounded-lg text-sm font-semibold text-white transition-all hover:brightness-110"
+                        style={{ background: '#663259' }}
+                    >
+                        <Plus size={16} />
+                        Alış Faturası Ekle
+                    </button>
+                    <button
+                        onClick={() => setShowPaymentModal(true)}
+                        className="h-8 flex items-center gap-1.5 px-3 rounded-lg text-sm font-semibold text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition-all"
+                    >
+                        <CreditCard size={16} />
+                        Ödeme Ekle
+                    </button>
+                </GradientHeader>
 
-            <div className="flex-1 overflow-hidden flex gap-6 px-5 pb-5">
+                <div className="flex-1 overflow-hidden flex gap-6">
                 {/* Left: Info & Stats */}
                 <div className="w-[280px] flex flex-col gap-4 shrink-0 h-full overflow-y-auto pr-2 custom-scrollbar pb-4">
                     {/* Info Card */}
@@ -400,6 +398,7 @@ const CompanyDetail: React.FC = () => {
                             </span>
                         </div>
                     </div>
+                </div>
                 </div>
             </div>
 

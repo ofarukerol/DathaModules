@@ -151,14 +151,6 @@ const ProductList: React.FC = () => {
                     {/* Category Filters */}
                     <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 flex-1">
                         <button
-                            onClick={() => setIsCategoryModalOpen(true)}
-                            className="flex items-center gap-2 px-3 py-2.5 bg-gray-100 text-gray-600 rounded-lg font-bold hover:bg-gray-200 transition-colors whitespace-nowrap border border-transparent hover:border-gray-300"
-                            title="Kategorileri Düzenle"
-                        >
-                            <Settings2 size={18} />
-                        </button>
-                        <div className="h-8 w-[1px] bg-gray-300 mx-1"></div>
-                        <button
                             onClick={() => setSelectedCategory('all')}
                             className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium shadow-sm transition-all whitespace-nowrap ${selectedCategory === 'all'
                                 ? 'bg-[#663259] text-white shadow-[#663259]/20'
@@ -181,6 +173,14 @@ const ProductList: React.FC = () => {
                                 {cat.name}
                             </button>
                         ))}
+                        <div className="h-8 w-[1px] bg-gray-300 mx-1"></div>
+                        <button
+                            onClick={() => setIsCategoryModalOpen(true)}
+                            className="flex items-center gap-2 px-3 py-2.5 bg-gray-100 text-gray-600 rounded-lg font-bold hover:bg-gray-200 transition-colors whitespace-nowrap border border-transparent hover:border-gray-300"
+                            title="Kategorileri Düzenle"
+                        >
+                            <Settings2 size={18} />
+                        </button>
                     </div>
 
                     {/* View Switcher */}

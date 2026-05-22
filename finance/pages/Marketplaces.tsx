@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import PageToolbar from '../../../components/PageToolbar';
+import GradientHeader from '../../../components/GradientHeader';
 
 interface Marketplace {
     id: string;
@@ -110,21 +110,20 @@ const Marketplaces: React.FC = () => {
         <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-gray-50">
             <div className="flex-1 overflow-hidden p-5 pt-4 flex flex-col gap-4">
 
-                <PageToolbar
+                <GradientHeader
                     icon="storefront"
                     title="Pazaryerleri"
-                    stats={`${connectedCount} bağlı platform`}
-                    actions={
-                        <button
-                            onClick={() => navigate('/finance/marketplaces/new')}
-                            className="h-8 flex items-center gap-1.5 px-3.5 rounded-lg text-sm font-semibold text-white transition-all hover:brightness-110"
-                            style={{ background: '#663259' }}
-                        >
-                            <span className="material-symbols-outlined text-[17px]">add</span>
-                            Yeni Entegrasyon
-                        </button>
-                    }
-                />
+                    subtitle={`${connectedCount} bağlı platform`}
+                >
+                    <button
+                        onClick={() => navigate('/finance/marketplaces/new')}
+                        className="h-8 flex items-center gap-1.5 px-3.5 rounded-lg text-sm font-semibold text-white transition-all hover:brightness-110"
+                        style={{ background: '#663259' }}
+                    >
+                        <span className="material-symbols-outlined text-[17px]">add</span>
+                        Yeni Entegrasyon
+                    </button>
+                </GradientHeader>
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar">

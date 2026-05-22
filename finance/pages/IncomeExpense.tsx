@@ -4,7 +4,7 @@ import FinanceTransactionModal from '../components/FinanceTransactionModal';
 import { useFinanceStore } from '../../../stores/useFinanceStore';
 import { useFinanceCategoryStore } from '../stores/useFinanceCategoryStore';
 import { financeService } from '../services/financeService';
-import PageToolbar from '../../../components/PageToolbar';
+import GradientHeader from '../../../components/GradientHeader';
 
 const MONTH_LABELS = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
 
@@ -116,31 +116,28 @@ const IncomeExpense: React.FC = () => {
             />
             <div className="flex-1 overflow-hidden p-5 pt-4 flex flex-col gap-4">
 
-                <PageToolbar
+                <GradientHeader
                     icon="query_stats"
                     title="Gelir & Gider"
-                    stats="Finansal analiz"
-                    actions={
-                        <>
-                            <button
-                                onClick={() => openModal('income')}
-                                className="h-8 flex items-center gap-1.5 px-3.5 rounded-lg text-sm font-semibold text-white transition-all hover:brightness-110"
-                                style={{ background: '#663259' }}
-                            >
-                                <span className="material-symbols-outlined text-[17px]">add</span>
-                                Gelir Ekle
-                            </button>
-                            <button
-                                onClick={() => openModal('expense')}
-                                className="h-8 flex items-center gap-1.5 px-3.5 rounded-lg text-sm font-semibold text-white transition-all hover:brightness-110"
-                                style={{ background: '#F97171' }}
-                            >
-                                <span className="material-symbols-outlined text-[17px]">remove</span>
-                                Gider Ekle
-                            </button>
-                        </>
-                    }
-                />
+                    subtitle="Finansal analiz"
+                >
+                    <button
+                        onClick={() => openModal('income')}
+                        className="h-8 flex items-center gap-1.5 px-3.5 rounded-lg text-sm font-semibold text-white transition-all hover:brightness-110"
+                        style={{ background: '#663259' }}
+                    >
+                        <span className="material-symbols-outlined text-[17px]">add</span>
+                        Gelir Ekle
+                    </button>
+                    <button
+                        onClick={() => openModal('expense')}
+                        className="h-8 flex items-center gap-1.5 px-3.5 rounded-lg text-sm font-semibold text-white transition-all hover:brightness-110"
+                        style={{ background: '#F97171' }}
+                    >
+                        <span className="material-symbols-outlined text-[17px]">remove</span>
+                        Gider Ekle
+                    </button>
+                </GradientHeader>
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-4">
                     {/* Summary + Chart Row */}

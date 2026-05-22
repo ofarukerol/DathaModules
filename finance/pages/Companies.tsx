@@ -7,7 +7,7 @@ import { formatCurrency } from '../../_shared/helpers';
 import CustomSelect from '../../../components/CustomSelect';
 import EmptyState from '../../../components/EmptyState';
 import ConfirmDialog from '../../../components/ConfirmDialog';
-import PageToolbar from '../../../components/PageToolbar';
+import GradientHeader from '../../../components/GradientHeader';
 
 const TYPE_COLORS: Record<CompanyType, { badge: string; avatar: string }> = {
     CUSTOMER: { badge: 'text-blue-600 bg-blue-50', avatar: 'bg-blue-100 text-blue-700' },
@@ -68,21 +68,21 @@ export default function Companies() {
         <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-gray-50">
             <div className="flex-1 overflow-hidden p-5 pt-4 flex flex-col gap-4">
 
-                <PageToolbar
+                <GradientHeader
                     icon="corporate_fare"
                     title="Cari Hesaplar"
-                    stats={`${companies.length} firma kayıtlı`}
-                    actions={
-                        <button
-                            onClick={() => setShowModal(true)}
-                            className="h-8 flex items-center gap-1.5 px-3.5 rounded-lg text-sm font-semibold text-white transition-all hover:brightness-110"
-                            style={{ background: '#663259' }}
-                        >
-                            <span className="material-symbols-outlined text-[17px]">add</span>
-                            Yeni Cari
-                        </button>
-                    }
-                />
+                    subtitle={`${companies.length} firma kayıtlı`}
+                >
+                    <button
+                        onClick={() => setShowModal(true)}
+                        className="h-10 flex items-center gap-2 pl-3 pr-4 rounded-xl text-sm font-semibold bg-white text-[#663259] hover:bg-white/95 active:scale-[0.98] transition-all shadow-sm"
+                    >
+                        <span className="w-6 h-6 rounded-lg bg-[#663259] text-white flex items-center justify-center">
+                            <span className="material-symbols-outlined text-[16px]">add</span>
+                        </span>
+                        Yeni Cari
+                    </button>
+                </GradientHeader>
 
                 {/* Filter Bar */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-4 py-3 flex items-center gap-3 shrink-0 flex-wrap">

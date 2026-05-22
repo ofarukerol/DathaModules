@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, X, Trash2, Pencil, Check, Shield } from 'lucide-react';
 import { useFinanceCategoryStore, FinanceCategory } from '../stores/useFinanceCategoryStore';
-import PageToolbar from '../../../components/PageToolbar';
+import GradientHeader from '../../../components/GradientHeader';
 
 const availableIcons = [
     'groups', 'home', 'bolt', 'inventory_2', 'gavel', 'cleaning_services',
@@ -93,10 +93,10 @@ const FinanceCategories: React.FC = () => {
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-gray-50">
             <div className="flex-1 overflow-hidden p-5 pt-4 flex flex-col gap-4">
-                <PageToolbar
+                <GradientHeader
                     icon="category"
                     title="Gelir & Gider Kategorileri"
-                    stats={`${expenseCategories.length} gider · ${incomeCategories.length} gelir kategorisi`}
+                    subtitle={`${expenseCategories.length} gider · ${incomeCategories.length} gelir kategorisi`}
                 />
 
                 {/* Content */}

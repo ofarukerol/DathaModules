@@ -8,7 +8,7 @@ import { formatCurrency, formatDate } from '../../_shared/helpers';
 import CustomSelect from '../../../components/CustomSelect';
 import DatePicker from '../../../components/DatePicker';
 import ConfirmDialog from '../../../components/ConfirmDialog';
-import PageToolbar from '../../../components/PageToolbar';
+import GradientHeader from '../../../components/GradientHeader';
 import FinanceTransactionModal from '../components/FinanceTransactionModal';
 import type { BankTransactionType, CheckType, CheckStatus, CheckNote } from '../types';
 
@@ -320,31 +320,28 @@ export default function Banks() {
             />
             <div className="flex-1 overflow-hidden p-5 pt-4 flex flex-col gap-4">
 
-                <PageToolbar
+                <GradientHeader
                     icon="account_balance_wallet"
                     title="Hesaplar"
-                    stats="Tüm finansal varlıklarınızı tek yerden kontrol edin"
-                    actions={
-                        <>
-                            {activeTab === 'bankalar' && (
-                                <button onClick={() => setShowBankModal(true)}
-                                    className="h-8 flex items-center gap-1.5 px-3.5 rounded-lg text-sm font-semibold text-white transition-all hover:brightness-110"
-                                    style={{ background: '#663259' }}>
-                                    <span className="material-symbols-outlined text-[17px]">add</span>
-                                    Yeni Hesap
-                                </button>
-                            )}
-                            {activeTab === 'cek-senet' && (
-                                <button onClick={() => setShowCheckModal(true)}
-                                    className="h-8 flex items-center gap-1.5 px-3.5 rounded-lg text-sm font-semibold text-white transition-all hover:brightness-110"
-                                    style={{ background: '#663259' }}>
-                                    <span className="material-symbols-outlined text-[17px]">add</span>
-                                    Yeni Çek/Senet
-                                </button>
-                            )}
-                        </>
-                    }
-                />
+                    subtitle="Tüm finansal varlıklarınızı tek yerden kontrol edin"
+                >
+                    {activeTab === 'bankalar' && (
+                        <button onClick={() => setShowBankModal(true)}
+                            className="h-8 flex items-center gap-1.5 px-3.5 rounded-lg text-sm font-semibold text-white transition-all hover:brightness-110"
+                            style={{ background: '#663259' }}>
+                            <span className="material-symbols-outlined text-[17px]">add</span>
+                            Yeni Hesap
+                        </button>
+                    )}
+                    {activeTab === 'cek-senet' && (
+                        <button onClick={() => setShowCheckModal(true)}
+                            className="h-8 flex items-center gap-1.5 px-3.5 rounded-lg text-sm font-semibold text-white transition-all hover:brightness-110"
+                            style={{ background: '#663259' }}>
+                            <span className="material-symbols-outlined text-[17px]">add</span>
+                            Yeni Çek/Senet
+                        </button>
+                    )}
+                </GradientHeader>
 
                 {/* Tabs */}
                 <div className="relative flex items-center bg-gray-100/80 rounded-2xl p-1.5 shrink-0 w-fit">

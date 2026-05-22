@@ -8,7 +8,7 @@ import { Invoice, InvoiceWithItems } from '../services/invoiceService';
 import CustomSelect from '../../../components/CustomSelect';
 import DatePicker from '../../../components/DatePicker';
 import { useEscapeKey } from '../../_shared/useEscapeKey';
-import PageToolbar from '../../../components/PageToolbar';
+import GradientHeader from '../../../components/GradientHeader';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -440,45 +440,43 @@ const Invoices: React.FC = () => {
         <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-gray-50">
             <div className="flex-1 overflow-hidden p-5 pt-4 flex flex-col gap-4">
 
-                <PageToolbar
+                <GradientHeader
                     icon="receipt_long"
                     title="Faturalar"
-                    stats="Fatura yönetim paneli"
-                    actions={
-                        <>
-                            <div className="flex items-center bg-gray-100 p-1 rounded-lg gap-1">
-                                <button
-                                    onClick={() => setActiveTab('purchase')}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${activeTab === 'purchase'
-                                        ? 'bg-white text-[#663259] shadow-sm'
-                                        : 'text-gray-500 hover:text-gray-700'
-                                        }`}
-                                >
-                                    <span className="material-symbols-outlined text-[16px]">call_received</span>
-                                    Gelen
-                                </button>
-                                <button
-                                    onClick={() => setActiveTab('sale')}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${activeTab === 'sale'
-                                        ? 'bg-white text-[#663259] shadow-sm'
-                                        : 'text-gray-500 hover:text-gray-700'
-                                        }`}
-                                >
-                                    <span className="material-symbols-outlined text-[16px]">call_made</span>
-                                    Giden
-                                </button>
-                            </div>
-                            <button
-                                onClick={() => setShowCompanyModal(true)}
-                                className="h-8 flex items-center gap-1.5 px-3.5 rounded-lg text-sm font-semibold text-white transition-all hover:brightness-110"
-                                style={{ background: '#663259' }}
-                            >
-                                <span className="material-symbols-outlined text-[17px]">add</span>
-                                Yeni Fatura
-                            </button>
-                        </>
-                    }
-                />
+                    subtitle="Fatura yönetim paneli"
+                >
+                    <div className="h-10 flex items-center bg-white/10 border border-white/15 p-1 rounded-xl gap-1">
+                        <button
+                            onClick={() => setActiveTab('purchase')}
+                            className={`h-full flex items-center gap-1.5 px-3 rounded-lg text-xs font-semibold transition-all ${activeTab === 'purchase'
+                                ? 'bg-white text-[#663259] shadow-sm'
+                                : 'text-white/70 hover:text-white hover:bg-white/10'
+                                }`}
+                        >
+                            <span className="material-symbols-outlined text-[16px]">call_received</span>
+                            Gelen
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('sale')}
+                            className={`h-full flex items-center gap-1.5 px-3 rounded-lg text-xs font-semibold transition-all ${activeTab === 'sale'
+                                ? 'bg-white text-[#663259] shadow-sm'
+                                : 'text-white/70 hover:text-white hover:bg-white/10'
+                                }`}
+                        >
+                            <span className="material-symbols-outlined text-[16px]">call_made</span>
+                            Giden
+                        </button>
+                    </div>
+                    <button
+                        onClick={() => setShowCompanyModal(true)}
+                        className="h-10 flex items-center gap-2 pl-3 pr-4 rounded-xl text-sm font-semibold bg-white text-[#663259] hover:bg-white/95 active:scale-[0.98] transition-all shadow-sm"
+                    >
+                        <span className="w-6 h-6 rounded-lg bg-[#663259] text-white flex items-center justify-center">
+                            <span className="material-symbols-outlined text-[16px]">add</span>
+                        </span>
+                        Yeni Fatura
+                    </button>
+                </GradientHeader>
                 {/* Scrollable Content */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4">
                     {/* Summary Cards */}
