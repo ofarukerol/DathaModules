@@ -198,3 +198,29 @@ export const integrationsApi = {
         return data;
     },
 };
+
+// ---------------- WhatsApp Embedded Signup (DAT-145 Item 11) ----------------
+
+export interface EmbeddedSignupPayload {
+    code: string;
+    wabaId: string;
+    phoneNumberId: string;
+    defaultBranchId?: string;
+}
+
+export interface EmbeddedSignupResult {
+    integrationId: string;
+    wabaId: string;
+    phoneNumberId: string;
+    status: 'CONNECTED';
+}
+
+export const whatsappOnboardingApi = {
+    async completeEmbeddedSignup(payload: EmbeddedSignupPayload): Promise<EmbeddedSignupResult> {
+        const { data } = await api.post<EmbeddedSignupResult>(
+            '/integrations/whatsapp/embedded-signup',
+            payload,
+        );
+        return data;
+    },
+};
