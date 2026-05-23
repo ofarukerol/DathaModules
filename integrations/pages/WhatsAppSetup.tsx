@@ -1,17 +1,15 @@
-// WhatsAppSetup — WhatsApp Business API bağlantı wizard'ı (4 adım)
-// @see DAT-145 Phase 4
+// WhatsAppSetup — WhatsApp Business API bağlantı sayfası
+// @see DAT-145 Item 11 (Embedded Signup)
 //
-// Akış:
-//   Step 1: Bilgi  → Meta Business Suite linki, gerekenler
-//   Step 2: Form   → WABA ID, Phone Number ID, Access Token, App Secret
-//   Step 3: Webhook → Backend webhook URL + Verify Token (kopyala, Meta'ya yapıştır)
-//   Step 4: Sonuç  → Entegrasyon CONNECTED, bot aktif
+// Varsayılan akış: Meta Embedded Signup (tek tıkla bağlanma)
+//   1. Bot ayarları (min sipariş, ödeme sorusu, varsayılan şube)
+//   2. "WhatsApp'a Bağlan" → FB.login popup → Meta'da WABA seç/oluştur
+//   3. Backend code'u uzun ömürlü token'a çevirir + WABA'ya subscribe eder
+//   4. Sonuç — entegrasyon CONNECTED
 //
-// Backend pattern: POST /integrations { provider: WHATSAPP, externalAccountId=phone_number_id,
-// externalStoreId=WABA ID, token=access_token, config={appSecret, verifyToken, webhookUrl} }
-// apiKey/apiSecret boş gönderilir (WhatsApp'ta kullanılmaz).
+// Fallback: "Gelişmiş kurulum" — manuel WABA ID + Token (sandbox/test için)
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import GradientHeader from '../../../components/GradientHeader';
 import { useIntegrationStore } from '../stores/useIntegrationStore';
@@ -21,58 +19,239 @@ import {
     PROVIDER_COLORS,
 } from '../../../shared/src';
 import type { IntegrationDto, BranchOption } from '../services/integrationsApi';
-import { tenantApi } from '../services/integrationsApi';
+import { tenantApi, whatsappOnboardingApi } from '../services/integrationsApi';
 
-type Step = 1 | 2 | 3 | 4 | 5;
+// ---------------- Facebook SDK type tanımları ----------------
+
+interface FBLoginResponse {
+    status: string;
+    authResponse?: {
+        code?: string;
+        accessToken?: string;
+        userID?: string;
+    };
+}
+
+interface FBLoginOptions {
+    config_id?: string;
+    response_type?: 'code' | 'token';
+    override_default_response_type?: boolean;
+    extras?: Record<string, unknown>;
+    scope?: string;
+}
+
+interface FBSDK {
+    init(opts: { appId: string; cookie: boolean; xfbml: boolean; version: string }): void;
+    login(callback: (response: FBLoginResponse) => void, opts?: FBLoginOptions): void;
+    AppEvents?: { logPageView(): void };
+}
+
+declare global {
+    interface Window {
+        FB?: FBSDK;
+        fbAsyncInit?: () => void;
+    }
+}
+
+// ---------------- Sabitler ----------------
+
+const FB_APP_ID = (import.meta.env.VITE_WHATSAPP_APP_ID as string | undefined) || '';
+const FB_CONFIG_ID = (import.meta.env.VITE_WHATSAPP_CONFIG_ID as string | undefined) || '';
+const FB_GRAPH_VERSION = 'v19.0';
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) || 'http://localhost:3000/api';
 const WEBHOOK_URL = `${API_BASE_URL}/webhooks/whatsapp`;
 
 function generateVerifyToken(): string {
-    // 32 karakterlik random hex — Meta verify_token için yeterli
     const arr = new Uint8Array(16);
     crypto.getRandomValues(arr);
     return Array.from(arr, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+// Facebook SDK'sını lazy load et (sadece bu sayfa açılınca)
+function loadFacebookSDK(appId: string): Promise<FBSDK> {
+    return new Promise((resolve, reject) => {
+        if (window.FB) {
+            resolve(window.FB);
+            return;
+        }
+        if (!appId) {
+            reject(new Error('VITE_WHATSAPP_APP_ID tanımsız'));
+            return;
+        }
+        window.fbAsyncInit = function () {
+            window.FB!.init({
+                appId,
+                cookie: true,
+                xfbml: false,
+                version: FB_GRAPH_VERSION,
+            });
+            resolve(window.FB!);
+        };
+        const existing = document.getElementById('facebook-jssdk');
+        if (existing) {
+            // Script yüklü ama init henüz çalışmamış — fbAsyncInit zaten çağrılacak
+            return;
+        }
+        const script = document.createElement('script');
+        script.id = 'facebook-jssdk';
+        script.src = 'https://connect.facebook.net/en_US/sdk.js';
+        script.async = true;
+        script.defer = true;
+        script.crossOrigin = 'anonymous';
+        script.onerror = () => reject(new Error('Facebook SDK yüklenemedi (internet bağlantısı?)'));
+        document.body.appendChild(script);
+    });
+}
+
+// ---------------- Ana bileşen ----------------
+
 export default function WhatsAppSetup() {
     const navigate = useNavigate();
     const { createIntegration } = useIntegrationStore();
 
-    const [step, setStep] = useState<Step>(1);
-    const [submitting, setSubmitting] = useState(false);
-    const [formError, setFormError] = useState<string | null>(null);
+    // Mod: 'embedded' (varsayılan, tek tıkla) | 'manual' (gelişmiş, eski wizard)
+    const [mode, setMode] = useState<'embedded' | 'manual'>('embedded');
 
-    const [wabaId, setWabaId] = useState('');
-    const [phoneNumberId, setPhoneNumberId] = useState('');
-    const [accessToken, setAccessToken] = useState('');
-    const [appSecret, setAppSecret] = useState('');
-
+    // Bot ayarları (her iki modda da)
     const [minOrderAmount, setMinOrderAmount] = useState(50);
     const [askPaymentMethod, setAskPaymentMethod] = useState(true);
     const [defaultBranchId, setDefaultBranchId] = useState<string>('');
     const [branches, setBranches] = useState<BranchOption[]>([]);
 
+    // Embedded Signup state
+    const [embedStatus, setEmbedStatus] = useState<'idle' | 'loading_sdk' | 'in_popup' | 'submitting' | 'done' | 'error'>('idle');
+    const [embedError, setEmbedError] = useState<string | null>(null);
+    const [embedResult, setEmbedResult] = useState<IntegrationDto | null>(null);
+
+    // Manual mode state (eski wizard'dan)
+    const [manualStep, setManualStep] = useState<1 | 2 | 3 | 4>(1);
+    const [wabaId, setWabaId] = useState('');
+    const [phoneNumberId, setPhoneNumberId] = useState('');
+    const [accessToken, setAccessToken] = useState('');
+    const [appSecret, setAppSecret] = useState('');
+    const [manualSubmitting, setManualSubmitting] = useState(false);
+    const [manualError, setManualError] = useState<string | null>(null);
+    const [manualResult, setManualResult] = useState<IntegrationDto | null>(null);
+    const verifyToken = useMemo(() => generateVerifyToken(), []);
+
+    const providerColors = PROVIDER_COLORS[IntegrationProvider.WHATSAPP];
+
     useEffect(() => {
         tenantApi.getBranches().then(setBranches).catch(() => {});
     }, []);
 
-    const verifyToken = useMemo(() => generateVerifyToken(), []);
+    // ---------------- Embedded Signup akışı ----------------
 
-    const [createdIntegration, setCreatedIntegration] = useState<IntegrationDto | null>(null);
+    const handleEmbeddedSignup = useCallback(async () => {
+        setEmbedError(null);
 
-    const providerColors = PROVIDER_COLORS[IntegrationProvider.WHATSAPP];
+        if (!FB_APP_ID) {
+            setEmbedError('Sistem yapılandırması eksik: WhatsApp App ID tanımlanmamış. Datha ekibiyle iletişime geçin.');
+            return;
+        }
 
-    const isFormValid =
+        setEmbedStatus('loading_sdk');
+        let FB: FBSDK;
+        try {
+            FB = await loadFacebookSDK(FB_APP_ID);
+        } catch (err) {
+            setEmbedError(err instanceof Error ? err.message : 'Facebook SDK yüklenemedi');
+            setEmbedStatus('error');
+            return;
+        }
+
+        setEmbedStatus('in_popup');
+
+        // Meta'nın popup'ından gelen WABA + Phone ID'yi yakalamak için listener
+        let receivedWaba: string | null = null;
+        let receivedPhone: string | null = null;
+        const messageHandler = (event: MessageEvent) => {
+            if (!event.origin.endsWith('facebook.com')) return;
+            try {
+                const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+                if (data?.type === 'WA_EMBEDDED_SIGNUP') {
+                    if (data.event === 'FINISH') {
+                        receivedWaba = data.data?.waba_id ?? null;
+                        receivedPhone = data.data?.phone_number_id ?? null;
+                    } else if (data.event === 'CANCEL') {
+                        setEmbedError('Kurulum iptal edildi');
+                        setEmbedStatus('idle');
+                    }
+                }
+            } catch {
+                // ignore
+            }
+        };
+        window.addEventListener('message', messageHandler);
+
+        FB.login(
+            (response) => {
+                window.removeEventListener('message', messageHandler);
+
+                if (!response.authResponse?.code) {
+                    setEmbedError('Bağlantı tamamlanamadı (Meta\'dan code dönmedi). Lütfen tekrar deneyin.');
+                    setEmbedStatus('error');
+                    return;
+                }
+                if (!receivedWaba || !receivedPhone) {
+                    setEmbedError('WhatsApp Business Account veya telefon ID alınamadı. Lütfen Meta\'da tüm adımları tamamladığınızdan emin olun.');
+                    setEmbedStatus('error');
+                    return;
+                }
+
+                // Backend'e gönder
+                setEmbedStatus('submitting');
+                whatsappOnboardingApi
+                    .completeEmbeddedSignup({
+                        code: response.authResponse.code,
+                        wabaId: receivedWaba,
+                        phoneNumberId: receivedPhone,
+                        defaultBranchId: defaultBranchId || undefined,
+                    })
+                    .then(async (result) => {
+                        // Listeyi refresh et → yeni integration'ı bul → bot tercihlerini config'e merge et
+                        await useIntegrationStore.getState().fetchIntegrations();
+                        const created = useIntegrationStore
+                            .getState()
+                            .integrations.find((i) => i.id === result.integrationId) ?? null;
+                        if (created) {
+                            const updated = await useIntegrationStore.getState().updateIntegration(created.id, {
+                                config: { ...created.config, minOrderAmount, askPaymentMethod },
+                            });
+                            setEmbedResult(updated);
+                        } else {
+                            setEmbedResult(null);
+                        }
+                        setEmbedStatus('done');
+                    })
+                    .catch((err: unknown) => {
+                        const apiError = err as { response?: { data?: { message?: string } }; message?: string };
+                        setEmbedError(apiError.response?.data?.message || apiError.message || 'Bağlantı kaydedilemedi');
+                        setEmbedStatus('error');
+                    });
+            },
+            {
+                config_id: FB_CONFIG_ID || undefined,
+                response_type: 'code',
+                override_default_response_type: true,
+                extras: { feature: 'whatsapp_embedded_signup', version: 2 },
+            },
+        );
+    }, [defaultBranchId, minOrderAmount, askPaymentMethod]);
+
+    // ---------------- Manual mode (eski wizard, fallback) ----------------
+
+    const isManualFormValid =
         wabaId.trim().length > 0 &&
         phoneNumberId.trim().length > 0 &&
         accessToken.trim().length > 0 &&
         appSecret.trim().length > 0;
 
-    const handleSubmit = async () => {
-        if (!isFormValid) return;
-        setSubmitting(true);
-        setFormError(null);
+    const handleManualSubmit = async () => {
+        if (!isManualFormValid) return;
+        setManualSubmitting(true);
+        setManualError(null);
         try {
             const created = await createIntegration({
                 provider: IntegrationProvider.WHATSAPP,
@@ -90,18 +269,20 @@ export default function WhatsAppSetup() {
                     askPaymentMethod,
                 },
             });
-            setCreatedIntegration(created);
+            setManualResult(created);
             if (defaultBranchId) {
                 await tenantApi.updateWhatsappDefaultBranch(defaultBranchId);
             }
-            setStep(4);
+            setManualStep(3);
         } catch (err: unknown) {
             const apiError = err as { response?: { data?: { message?: string } }; message?: string };
-            setFormError(apiError.response?.data?.message || apiError.message || 'Entegrasyon kaydedilemedi');
+            setManualError(apiError.response?.data?.message || apiError.message || 'Entegrasyon kaydedilemedi');
         } finally {
-            setSubmitting(false);
+            setManualSubmitting(false);
         }
     };
+
+    // ---------------- Render ----------------
 
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-gray-50">
@@ -109,336 +290,168 @@ export default function WhatsAppSetup() {
                 <GradientHeader
                     icon="chat"
                     title={`${PROVIDER_LABELS[IntegrationProvider.WHATSAPP]} Entegrasyonu`}
-                    subtitle={`Adım ${step} / 5`}
+                    subtitle="Müşterileriniz WhatsApp üzerinden sipariş verebilir"
                 />
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
                     <div className="max-w-2xl mx-auto bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
-                        {/* Step header chip */}
-                        <div className="flex items-center gap-3 mb-6">
+                        {/* Provider chip */}
+                        <div className="flex items-center justify-between mb-6">
                             <div
-                                className="w-12 h-12 rounded-xl flex items-center justify-center text-xl font-black"
+                                className="w-14 h-14 rounded-xl flex items-center justify-center text-2xl font-black"
                                 style={{ backgroundColor: providerColors.bg, color: providerColors.fg }}
                             >
                                 {providerColors.logo}
                             </div>
-                            <div className="flex gap-1.5">
-                                {[1, 2, 3, 4, 5].map((s) => (
-                                    <div
-                                        key={s}
-                                        className={`w-8 h-1.5 rounded-full ${
-                                            s <= step ? 'bg-[#663259]' : 'bg-gray-200'
-                                        }`}
-                                    />
-                                ))}
-                            </div>
+                            {mode === 'embedded' && embedStatus !== 'done' && (
+                                <button
+                                    onClick={() => setMode('manual')}
+                                    className="text-xs text-gray-500 underline hover:text-gray-700"
+                                >
+                                    Gelişmiş: Manuel kurulum
+                                </button>
+                            )}
+                            {mode === 'manual' && manualStep < 3 && (
+                                <button
+                                    onClick={() => setMode('embedded')}
+                                    className="text-xs text-gray-500 underline hover:text-gray-700"
+                                >
+                                    ← Otomatik bağlanmaya dön
+                                </button>
+                            )}
                         </div>
 
-                        {/* Step 1: Bilgi */}
-                        {step === 1 && (
-                            <div className="flex flex-col gap-4">
-                                <h2 className="text-xl font-bold text-gray-800">Başlamadan önce</h2>
-                                <p className="text-sm text-gray-600 leading-relaxed">
-                                    Müşterilerinizden WhatsApp üzerinden doğal dilde sipariş alabilmek için
-                                    Meta WhatsApp Business API'sine bağlanmanız gerekir. Bu işlem için
-                                    <strong> Meta for Business</strong> hesabınız ve onaylı bir WhatsApp Business
-                                    Account'unuz (WABA) olmalıdır.
-                                </p>
-                                <a
-                                    href="https://business.facebook.com/wa/manage/home/"
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="text-sm font-semibold underline"
-                                    style={{ color: providerColors.fg }}
-                                >
-                                    Meta WhatsApp Manager'a Git →
-                                </a>
-                                <p className="text-sm text-gray-600 mt-2">
-                                    Aşağıdaki bilgileri elinizin altında bulundurun:
-                                </p>
-                                <ul className="text-sm text-gray-700 list-disc pl-5 space-y-1">
-                                    <li>WhatsApp Business Account ID (WABA ID)</li>
-                                    <li>Phone Number ID (Meta'nın atadığı telefon ID'si)</li>
-                                    <li>Access Token (uzun ömürlü WABA token — System User'dan oluşturun)</li>
-                                    <li>App Secret (Meta App ayarlarından)</li>
-                                </ul>
-                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mt-2 text-sm text-amber-800">
-                                    <p className="font-bold mb-1">💡 İpucu</p>
-                                    <p>
-                                        Test için Meta'nın sandbox numarasını kullanabilirsiniz. Canlıya
-                                        çıkmak için iş telefonunuzun Meta tarafından onaylanması gerekir
-                                        (1-3 iş günü sürebilir).
+                        {/* ============ EMBEDDED SIGNUP MODE ============ */}
+                        {mode === 'embedded' && embedStatus !== 'done' && (
+                            <div className="flex flex-col gap-5">
+                                <div>
+                                    <h2 className="text-xl font-bold text-gray-800">WhatsApp'a tek tıkla bağlan</h2>
+                                    <p className="text-sm text-gray-600 leading-relaxed mt-2">
+                                        Aşağıdaki ayarları yapıp <strong>WhatsApp'a Bağlan</strong> butonuna tıklayın.
+                                        Açılan Meta penceresinde işletme telefonunuzu seçin/ekleyin, izin verin.
+                                        Bağlantı otomatik tamamlanır.
                                     </p>
                                 </div>
-                                <button
-                                    onClick={() => setStep(2)}
-                                    className="self-end mt-4 px-5 py-2.5 rounded-xl bg-[#663259] text-white font-bold text-sm hover:shadow-lg hover:shadow-[#663259]/20"
-                                >
-                                    Devam Et →
-                                </button>
-                            </div>
-                        )}
 
-                        {/* Step 2: Form */}
-                        {step === 2 && (
-                            <div className="flex flex-col gap-4">
-                                <h2 className="text-xl font-bold text-gray-800">Meta Credentials</h2>
-                                <FormField
-                                    label="WhatsApp Business Account ID (WABA)"
-                                    placeholder="örn: 123456789012345"
-                                    value={wabaId}
-                                    onChange={setWabaId}
-                                    required
-                                    helper="Meta Business Suite → WhatsApp Manager → Hesap Bilgileri"
-                                />
-                                <FormField
-                                    label="Phone Number ID"
-                                    placeholder="örn: 987654321098765"
-                                    value={phoneNumberId}
-                                    onChange={setPhoneNumberId}
-                                    required
-                                    helper="Bot mesajlarının geldiği telefonun Meta-side ID'si"
-                                />
-                                <FormField
-                                    label="Access Token (System User Token)"
-                                    placeholder="EAAGm0PX4ZCpsBO..."
-                                    value={accessToken}
-                                    onChange={setAccessToken}
-                                    required
-                                    isSecret
-                                    helper="Meta Business Settings → System Users → Token (1 yıl ömürlü)"
-                                />
-                                <FormField
-                                    label="App Secret"
-                                    placeholder="abc123def456..."
-                                    value={appSecret}
-                                    onChange={setAppSecret}
-                                    required
-                                    isSecret
-                                    helper="Meta App → Settings → Basic → App Secret (webhook imza doğrulama için)"
-                                />
+                                {/* Bot ayarları */}
+                                <div className="bg-gray-50 rounded-xl p-5 flex flex-col gap-4 border border-gray-100">
+                                    <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Bot Ayarları</h3>
 
-                                <div className="flex justify-between mt-4">
-                                    <button
-                                        onClick={() => setStep(1)}
-                                        className="px-5 py-2.5 rounded-xl bg-gray-100 text-gray-700 font-bold text-sm hover:bg-gray-200"
-                                    >
-                                        ← Geri
-                                    </button>
-                                    <button
-                                        onClick={() => setStep(3)}
-                                        disabled={!isFormValid}
-                                        className="px-5 py-2.5 rounded-xl bg-[#663259] text-white font-bold text-sm hover:shadow-lg hover:shadow-[#663259]/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        Devam Et →
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Step 3: Bot Ayarları */}
-                        {step === 3 && (
-                            <div className="flex flex-col gap-5">
-                                <h2 className="text-xl font-bold text-gray-800">Bot Ayarları</h2>
-                                <p className="text-sm text-gray-600 leading-relaxed">
-                                    Botun sipariş alma davranışını özelleştirin. Bu ayarlar daha sonra
-                                    entegrasyon detayından değiştirilebilir.
-                                </p>
-
-                                {/* Min Sipariş Tutarı */}
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="font-bold text-sm">
-                                        Minimum Sipariş Tutarı (₺)
-                                    </label>
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex flex-col gap-1.5">
+                                        <label className="font-bold text-sm">Minimum sipariş tutarı (₺)</label>
                                         <input
                                             type="number"
                                             min={0}
-                                            step={5}
                                             value={minOrderAmount}
-                                            onChange={(e) => setMinOrderAmount(Math.max(0, Number(e.target.value)))}
-                                            className="w-32 rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-[#663259] focus:ring-1 focus:ring-[#663259]"
+                                            onChange={(e) => setMinOrderAmount(Number(e.target.value))}
+                                            className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-[#663259] focus:ring-1 focus:ring-[#663259] outline-none"
                                         />
-                                        <span className="text-sm text-gray-500">
-                                            Bu tutarın altındaki siparişler kabul edilmez.
-                                        </span>
+                                        <p className="text-xs text-gray-500">Bu tutarın altındaki siparişleri bot otomatik reddeder.</p>
                                     </div>
-                                    <p className="text-xs text-gray-400">Varsayılan: 50₺ · 0 girersen limit uygulanmaz</p>
+
+                                    <label className="flex items-center gap-3 cursor-pointer select-none">
+                                        <input
+                                            type="checkbox"
+                                            checked={askPaymentMethod}
+                                            onChange={(e) => setAskPaymentMethod(e.target.checked)}
+                                            className="w-5 h-5 rounded accent-[#663259]"
+                                        />
+                                        <div>
+                                            <div className="font-bold text-sm">Ödeme yöntemini sor</div>
+                                            <div className="text-xs text-gray-500">Bot sipariş onayında "Nakit / Kart / Online" sorar.</div>
+                                        </div>
+                                    </label>
+
+                                    {branches.length > 1 && (
+                                        <div className="flex flex-col gap-1.5">
+                                            <label className="font-bold text-sm">Varsayılan şube</label>
+                                            <select
+                                                value={defaultBranchId}
+                                                onChange={(e) => setDefaultBranchId(e.target.value)}
+                                                className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-[#663259] focus:ring-1 focus:ring-[#663259] outline-none bg-white"
+                                            >
+                                                <option value="">Otomatik (ana şube)</option>
+                                                {branches.map((b) => (
+                                                    <option key={b.id} value={b.id}>
+                                                        {b.name}
+                                                        {b.isMainBranch ? ' (Ana)' : ''}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <p className="text-xs text-gray-500">WhatsApp siparişleri bu şubeye düşer.</p>
+                                        </div>
+                                    )}
                                 </div>
 
-                                {/* Varsayılan Şube */}
-                                {branches.length > 1 && (
-                                    <div className="flex flex-col gap-1.5">
-                                        <label className="font-bold text-sm">Varsayılan Şube</label>
-                                        <select
-                                            value={defaultBranchId}
-                                            onChange={(e) => setDefaultBranchId(e.target.value)}
-                                            className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-[#663259] focus:ring-1 focus:ring-[#663259] bg-white"
-                                        >
-                                            <option value="">Otomatik (ana şube → ilk aktif)</option>
-                                            {branches.map((b) => (
-                                                <option key={b.id} value={b.id}>
-                                                    {b.name}{b.isMainBranch ? ' (Ana Şube)' : ''}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <p className="text-xs text-gray-400">WhatsApp siparişlerinin düşeceği şube. Seçilmezse ana şube kullanılır.</p>
+                                {embedError && (
+                                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+                                        <p className="font-bold mb-1">⚠ Hata</p>
+                                        <p>{embedError}</p>
                                     </div>
                                 )}
 
-                                {/* Ödeme Yöntemi Sor */}
-                                <div className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3.5">
-                                    <div>
-                                        <p className="font-bold text-sm text-gray-800">Ödeme Yöntemi Sor</p>
-                                        <p className="text-xs text-gray-500 mt-0.5">
-                                            Aktifken bot sipariş onayından önce ödeme yöntemini (Nakit / Kart / Yemek Kartı) sorar.
-                                        </p>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setAskPaymentMethod(!askPaymentMethod)}
-                                        className={`relative w-11 h-6 rounded-full transition-colors ${
-                                            askPaymentMethod ? 'bg-[#663259]' : 'bg-gray-200'
-                                        }`}
-                                    >
-                                        <span
-                                            className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                                                askPaymentMethod ? 'translate-x-5' : 'translate-x-0'
-                                            }`}
-                                        />
-                                    </button>
-                                </div>
-
-                                {formError && (
-                                    <p className="text-sm text-red-600">{formError}</p>
-                                )}
-
-                                <div className="flex justify-between mt-2">
-                                    <button
-                                        onClick={() => setStep(2)}
-                                        className="px-5 py-2.5 rounded-xl bg-gray-100 text-gray-700 font-bold text-sm hover:bg-gray-200"
-                                    >
-                                        ← Geri
-                                    </button>
-                                    <button
-                                        onClick={handleSubmit}
-                                        disabled={submitting}
-                                        className="px-5 py-2.5 rounded-xl bg-[#663259] text-white font-bold text-sm hover:shadow-lg hover:shadow-[#663259]/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        {submitting ? 'Kaydediliyor...' : 'Kaydet ve Devam Et →'}
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Step 4: Webhook URL */}
-                        {step === 4 && createdIntegration && (
-                            <div className="flex flex-col gap-4">
-                                <h2 className="text-xl font-bold text-gray-800">Meta Webhook Ayarları</h2>
-                                <p className="text-sm text-gray-600 leading-relaxed">
-                                    Credentials kaydedildi. Şimdi Meta'da webhook'u bağlayalım.
-                                    <strong> Meta App Dashboard → WhatsApp → Configuration → Webhooks</strong>
-                                    {' '}sayfasına gidip aşağıdaki bilgileri yapıştırın:
-                                </p>
-
-                                <CopyField
-                                    label="Callback URL"
-                                    value={WEBHOOK_URL}
-                                />
-                                <CopyField
-                                    label="Verify Token"
-                                    value={verifyToken}
-                                    note="Bu token bizde de saklı, Meta ile karşılaştırarak webhook doğrulanır."
-                                />
-
-                                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mt-2 text-sm text-blue-800">
-                                    <p className="font-bold mb-1">📋 Webhook Field'ları</p>
-                                    <p className="mb-2">Meta'da şu field'lara abone olmanız gerekir:</p>
-                                    <ul className="list-disc pl-5 space-y-0.5">
-                                        <li><code className="bg-blue-100 px-1 rounded">messages</code> (zorunlu — gelen mesajlar)</li>
-                                        <li><code className="bg-blue-100 px-1 rounded">message_status</code> (opsiyonel — teslim durumu)</li>
-                                    </ul>
-                                </div>
-
-                                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-sm text-emerald-800">
-                                    <p className="font-bold mb-1">✅ Saklanan Bilgiler</p>
-                                    <p className="font-mono text-xs">WABA ID: <strong>{createdIntegration.externalStoreId}</strong></p>
-                                    <p className="font-mono text-xs">Phone ID: <strong>{createdIntegration.externalAccountId}</strong></p>
-                                    <p className="font-mono text-xs">Access Token: <strong>{createdIntegration.hasToken ? '••••••••' : '(eksik)'}</strong></p>
-                                </div>
-
-                                <div className="flex justify-between mt-4">
-                                    <button
-                                        onClick={() => setStep(3)}
-                                        className="px-5 py-2.5 rounded-xl bg-gray-100 text-gray-700 font-bold text-sm hover:bg-gray-200"
-                                    >
-                                        ← Düzenle
-                                    </button>
-                                    <button
-                                        onClick={() => setStep(5)}
-                                        className="px-5 py-2.5 rounded-xl bg-[#663259] text-white font-bold text-sm hover:shadow-lg hover:shadow-[#663259]/20"
-                                    >
-                                        Tamamla →
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Step 5: Sonuç */}
-                        {step === 5 && createdIntegration && (
-                            <div className="flex flex-col gap-4">
-                                <h2 className="text-xl font-bold text-gray-800">Kurulum Tamamlandı</h2>
-                                <div
-                                    className="rounded-xl p-5 border"
-                                    style={{
-                                        backgroundColor: providerColors.bg,
-                                        borderColor: providerColors.fg + '40',
-                                    }}
+                                <button
+                                    onClick={handleEmbeddedSignup}
+                                    disabled={embedStatus === 'loading_sdk' || embedStatus === 'in_popup' || embedStatus === 'submitting'}
+                                    className="w-full mt-2 px-6 py-3.5 rounded-xl font-bold text-base text-white shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                                    style={{ background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)' }}
                                 >
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <span
-                                            className="material-symbols-outlined"
-                                            style={{ color: providerColors.fg }}
-                                        >
-                                            check_circle
+                                    {embedStatus === 'idle' && (
+                                        <span className="flex items-center justify-center gap-2">
+                                            <span className="material-symbols-outlined text-[20px]">link</span>
+                                            WhatsApp'a Bağlan
                                         </span>
-                                        <p className="font-bold" style={{ color: providerColors.fg }}>
-                                            WhatsApp botu aktif
-                                        </p>
-                                    </div>
-                                    <p className="text-sm text-gray-700">
-                                        Müşterileriniz artık <strong>{createdIntegration.externalAccountId}</strong> ID'li
-                                        WhatsApp numaranıza mesaj attığında bot otomatik yanıtlayacak ve
-                                        siparişleri sisteme alacak.
-                                    </p>
-                                </div>
+                                    )}
+                                    {embedStatus === 'loading_sdk' && 'Yükleniyor...'}
+                                    {embedStatus === 'in_popup' && 'Meta penceresinde devam edin...'}
+                                    {embedStatus === 'submitting' && 'Bağlantı tamamlanıyor...'}
+                                    {embedStatus === 'error' && 'Tekrar dene'}
+                                </button>
 
-                                <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-700">
-                                    <p className="font-bold mb-2">İlk Test İçin</p>
-                                    <ol className="list-decimal pl-5 space-y-1">
-                                        <li>Test telefonundan WhatsApp numaranıza <em>"merhaba"</em> yazın</li>
-                                        <li>Bot karşılama mesajı dönmeli</li>
-                                        <li><em>"menü"</em> yazın → ürünleriniz listelenmeli</li>
-                                        <li><em>"2 köfte"</em> gibi sipariş yazıp → <em>"evet"</em> ile onaylayın</li>
-                                        <li>Sipariş paneline yeni siparişin düştüğünü kontrol edin</li>
-                                    </ol>
-                                </div>
-
-                                <div className="flex justify-between mt-4">
-                                    <button
-                                        onClick={() => navigate('/finance/marketplaces')}
-                                        className="px-5 py-2.5 rounded-xl bg-gray-100 text-gray-700 font-bold text-sm hover:bg-gray-200"
-                                    >
-                                        Pazaryerleri Listesine Dön
-                                    </button>
-                                    <button
-                                        onClick={() => navigate(`/finance/marketplaces/${createdIntegration.id}`)}
-                                        className="px-5 py-2.5 rounded-xl bg-[#663259] text-white font-bold text-sm hover:shadow-lg hover:shadow-[#663259]/20"
-                                    >
-                                        Detay Sayfasına Git →
-                                    </button>
-                                </div>
+                                <p className="text-xs text-gray-500 text-center mt-1">
+                                    Bağlanarak <a href="https://www.whatsapp.com/legal/business-policy" target="_blank" rel="noreferrer" className="underline">WhatsApp Business Politikası</a>'nı kabul etmiş olursunuz.
+                                </p>
                             </div>
+                        )}
+
+                        {/* ============ EMBEDDED SUCCESS ============ */}
+                        {mode === 'embedded' && embedStatus === 'done' && (
+                            <SuccessScreen
+                                integration={embedResult}
+                                onGoBack={() => navigate('/finance/marketplaces')}
+                            />
+                        )}
+
+                        {/* ============ MANUAL MODE (fallback wizard) ============ */}
+                        {mode === 'manual' && (
+                            <ManualWizard
+                                step={manualStep}
+                                setStep={setManualStep}
+                                wabaId={wabaId}
+                                setWabaId={setWabaId}
+                                phoneNumberId={phoneNumberId}
+                                setPhoneNumberId={setPhoneNumberId}
+                                accessToken={accessToken}
+                                setAccessToken={setAccessToken}
+                                appSecret={appSecret}
+                                setAppSecret={setAppSecret}
+                                minOrderAmount={minOrderAmount}
+                                setMinOrderAmount={setMinOrderAmount}
+                                askPaymentMethod={askPaymentMethod}
+                                setAskPaymentMethod={setAskPaymentMethod}
+                                defaultBranchId={defaultBranchId}
+                                setDefaultBranchId={setDefaultBranchId}
+                                branches={branches}
+                                webhookUrl={WEBHOOK_URL}
+                                verifyToken={verifyToken}
+                                isFormValid={isManualFormValid}
+                                submitting={manualSubmitting}
+                                error={manualError}
+                                result={manualResult}
+                                onSubmit={handleManualSubmit}
+                                onFinish={() => navigate('/finance/marketplaces')}
+                                providerColor={providerColors.fg}
+                            />
                         )}
                     </div>
                 </div>
@@ -447,53 +460,183 @@ export default function WhatsAppSetup() {
     );
 }
 
-// ----- Form field component (TrendyolFoodSetup'tan mirror, helper text destekli) -----
+// ---------------- Success ekranı ----------------
+
+interface SuccessScreenProps {
+    integration: IntegrationDto | null;
+    onGoBack: () => void;
+}
+
+function SuccessScreen({ integration, onGoBack }: SuccessScreenProps) {
+    return (
+        <div className="flex flex-col items-center gap-4 text-center py-6">
+            <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center">
+                <span className="material-symbols-outlined text-emerald-600 text-[44px]">check_circle</span>
+            </div>
+            <h2 className="text-xl font-bold text-gray-800">Bağlantı tamamlandı ✓</h2>
+            <p className="text-sm text-gray-600 max-w-md">
+                WhatsApp Business hesabınız Datha'ya bağlandı. Artık müşterileriniz işletme numaranıza yazdıklarında
+                bot otomatik sipariş alacak.
+            </p>
+            {integration && (
+                <div className="bg-gray-50 rounded-xl p-4 text-xs text-gray-600 font-mono w-full max-w-md text-left">
+                    <div>WABA ID: {integration.externalStoreId}</div>
+                    <div>Phone ID: {integration.externalAccountId}</div>
+                </div>
+            )}
+            <button
+                onClick={onGoBack}
+                className="mt-2 px-6 py-2.5 rounded-xl bg-[#663259] text-white font-bold text-sm hover:shadow-lg hover:shadow-[#663259]/20"
+            >
+                Pazaryerlerine Dön
+            </button>
+        </div>
+    );
+}
+
+// ---------------- Manuel Wizard (eski 5-step akış, advanced) ----------------
+
+interface ManualWizardProps {
+    step: 1 | 2 | 3 | 4;
+    setStep: (s: 1 | 2 | 3 | 4) => void;
+    wabaId: string;
+    setWabaId: (v: string) => void;
+    phoneNumberId: string;
+    setPhoneNumberId: (v: string) => void;
+    accessToken: string;
+    setAccessToken: (v: string) => void;
+    appSecret: string;
+    setAppSecret: (v: string) => void;
+    minOrderAmount: number;
+    setMinOrderAmount: (v: number) => void;
+    askPaymentMethod: boolean;
+    setAskPaymentMethod: (v: boolean) => void;
+    defaultBranchId: string;
+    setDefaultBranchId: (v: string) => void;
+    branches: BranchOption[];
+    webhookUrl: string;
+    verifyToken: string;
+    isFormValid: boolean;
+    submitting: boolean;
+    error: string | null;
+    result: IntegrationDto | null;
+    onSubmit: () => void;
+    onFinish: () => void;
+    providerColor: string;
+}
+
+function ManualWizard(p: ManualWizardProps) {
+    return (
+        <div className="flex flex-col gap-4">
+            {/* Step pill */}
+            <div className="flex gap-1.5 mb-2">
+                {[1, 2, 3, 4].map((s) => (
+                    <div
+                        key={s}
+                        className={`flex-1 h-1.5 rounded-full ${s <= p.step ? 'bg-[#663259]' : 'bg-gray-200'}`}
+                    />
+                ))}
+            </div>
+
+            {p.step === 1 && (
+                <>
+                    <h2 className="text-xl font-bold text-gray-800">Manuel Kurulum: Credentials</h2>
+                    <p className="text-sm text-gray-600">
+                        Meta App'inizden aldığınız WABA bilgilerini girin. (Sandbox/test ya da kendi Meta App'iniz olan
+                        durumlar için.)
+                    </p>
+                    <FormField label="WABA ID" placeholder="123456789012345" value={p.wabaId} onChange={p.setWabaId} required />
+                    <FormField label="Phone Number ID" placeholder="987654321098765" value={p.phoneNumberId} onChange={p.setPhoneNumberId} required />
+                    <FormField label="Access Token" placeholder="EAAxxx..." value={p.accessToken} onChange={p.setAccessToken} required type="password" />
+                    <FormField label="App Secret" placeholder="abc123..." value={p.appSecret} onChange={p.setAppSecret} required type="password" />
+                    <button
+                        onClick={() => p.setStep(2)}
+                        disabled={!p.isFormValid}
+                        className="self-end mt-2 px-5 py-2.5 rounded-xl bg-[#663259] text-white font-bold text-sm disabled:opacity-50"
+                    >
+                        Devam Et →
+                    </button>
+                </>
+            )}
+
+            {p.step === 2 && (
+                <>
+                    <h2 className="text-xl font-bold text-gray-800">Bot Ayarları</h2>
+                    <FormField label="Min sipariş tutarı (₺)" value={String(p.minOrderAmount)} onChange={(v) => p.setMinOrderAmount(Number(v) || 0)} type="number" />
+                    <label className="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" checked={p.askPaymentMethod} onChange={(e) => p.setAskPaymentMethod(e.target.checked)} className="w-5 h-5 accent-[#663259]" />
+                        <span className="text-sm font-bold">Ödeme yöntemini sor</span>
+                    </label>
+                    {p.branches.length > 1 && (
+                        <div className="flex flex-col gap-1.5">
+                            <label className="font-bold text-sm">Varsayılan şube</label>
+                            <select value={p.defaultBranchId} onChange={(e) => p.setDefaultBranchId(e.target.value)} className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm bg-white">
+                                <option value="">Otomatik (ana şube)</option>
+                                {p.branches.map((b) => (
+                                    <option key={b.id} value={b.id}>{b.name}{b.isMainBranch ? ' (Ana)' : ''}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                    {p.error && <div className="text-sm text-red-600">{p.error}</div>}
+                    <div className="flex justify-between mt-2">
+                        <button onClick={() => p.setStep(1)} className="px-5 py-2.5 rounded-xl bg-gray-100 font-bold text-sm">← Geri</button>
+                        <button onClick={p.onSubmit} disabled={p.submitting} className="px-5 py-2.5 rounded-xl bg-[#663259] text-white font-bold text-sm disabled:opacity-50">
+                            {p.submitting ? 'Kaydediliyor...' : 'Kaydet ve Webhook Bilgilerini Göster →'}
+                        </button>
+                    </div>
+                </>
+            )}
+
+            {p.step === 3 && p.result && (
+                <>
+                    <h2 className="text-xl font-bold text-gray-800">Webhook'u Meta'da Ayarla</h2>
+                    <p className="text-sm text-gray-600">
+                        Meta App → WhatsApp → Configuration → Webhooks bölümünde aşağıdakileri girin:
+                    </p>
+                    <CopyField label="Callback URL" value={p.webhookUrl} />
+                    <CopyField label="Verify Token" value={p.verifyToken} note="Backend ENV: WHATSAPP_VERIFY_TOKEN ile aynı olmalı" />
+                    <button onClick={() => p.setStep(4)} className="self-end mt-2 px-5 py-2.5 rounded-xl bg-[#663259] text-white font-bold text-sm">Bitir →</button>
+                </>
+            )}
+
+            {p.step === 4 && (
+                <SuccessScreen integration={p.result} onGoBack={p.onFinish} />
+            )}
+        </div>
+    );
+}
+
+// ---------------- Yardımcı bileşenler ----------------
 
 interface FormFieldProps {
     label: string;
-    placeholder: string;
     value: string;
     onChange: (v: string) => void;
+    placeholder?: string;
     required?: boolean;
-    isSecret?: boolean;
     helper?: string;
+    type?: 'text' | 'password' | 'number';
 }
 
-function FormField({ label, placeholder, value, onChange, required, isSecret, helper }: FormFieldProps) {
-    const [show, setShow] = useState(false);
-    const inputType = isSecret && !show ? 'password' : 'text';
+function FormField({ label, value, onChange, placeholder, required, helper, type = 'text' }: FormFieldProps) {
     return (
         <div className="flex flex-col gap-1.5">
             <label className="font-bold text-sm">
                 {label}
                 {required && <span className="text-red-500 ml-0.5">*</span>}
             </label>
-            <div className="relative">
-                <input
-                    type={inputType}
-                    value={value}
-                    onChange={(e) => onChange(e.target.value)}
-                    placeholder={placeholder}
-                    className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-[#663259] focus:ring-1 focus:ring-[#663259]"
-                />
-                {isSecret && value && (
-                    <button
-                        type="button"
-                        onClick={() => setShow(!show)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                        <span className="material-symbols-outlined text-[18px]">
-                            {show ? 'visibility_off' : 'visibility'}
-                        </span>
-                    </button>
-                )}
-            </div>
+            <input
+                type={type}
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                placeholder={placeholder}
+                className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-[#663259] focus:ring-1 focus:ring-[#663259] outline-none"
+            />
             {helper && <p className="text-xs text-gray-500">{helper}</p>}
         </div>
     );
 }
-
-// ----- Copy-to-clipboard field -----
 
 interface CopyFieldProps {
     label: string;
