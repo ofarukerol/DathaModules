@@ -25,14 +25,15 @@ interface AddTodoModalProps {
     isOpen: boolean;
     onClose: () => void;
     getUsersFn?: () => Promise<DBUser[]>;
+    canAssign?: boolean;
 }
 
-const AddTodoModal: React.FC<AddTodoModalProps> = ({ isOpen, onClose, getUsersFn }) => {
+const AddTodoModal: React.FC<AddTodoModalProps> = ({ isOpen, onClose, getUsersFn, canAssign = true }) => {
     useEscapeKey(onClose, isOpen);
     const { addTodo } = useTodoStore();
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
-    const [assignee, setAssignee] = useState('');
+    const [assignees, setAssignees] = useState<{ id: string; name: string }[]>([]);
     const [dueDate, setDueDate] = useState('');
     const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
     const [users, setUsers] = useState<DBUser[]>([]);
@@ -53,7 +54,8 @@ const AddTodoModal: React.FC<AddTodoModalProps> = ({ isOpen, onClose, getUsersFn
         const newTodoId = await addTodo({
             title,
             description,
-            assignee,
+            assignee: assignees[0]?.name ?? '',
+            assignees,
             due_date: dueDate || undefined,
             status: 'todo',
         });
@@ -66,7 +68,7 @@ const AddTodoModal: React.FC<AddTodoModalProps> = ({ isOpen, onClose, getUsersFn
         // Reset
         setTitle('');
         setDescription('');
-        setAssignee('');
+        setAssignees([]);
         setDueDate('');
         setSelectedTagIds([]);
         onClose();
@@ -162,25 +164,26 @@ const AddTodoModal: React.FC<AddTodoModalProps> = ({ isOpen, onClose, getUsersFn
                                     </div>
                                 </div>
 
-                                {/* Sorumlular */}
+                                {/* Sorumlular — coklu atama (yetkili kullanici) */}
+                                {canAssign && (
                                 <div className="relative">
                                     <label className="block text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3">Sorumlular</label>
                                     <div className="flex items-center flex-wrap gap-2">
-                                        {assignee ? (
-                                            <div className="flex items-center gap-2 bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-full group">
+                                        {assignees.map((u) => (
+                                            <div key={u.id} className="flex items-center gap-2 bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-full group">
                                                 <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-bold">
-                                                    {assignee.charAt(0).toUpperCase()}
+                                                    {u.name.charAt(0).toUpperCase()}
                                                 </div>
-                                                <span className="text-sm font-bold text-gray-700">{assignee}</span>
+                                                <span className="text-sm font-bold text-gray-700">{u.name}</span>
                                                 <button
                                                     type="button"
-                                                    onClick={() => setAssignee('')}
+                                                    onClick={() => setAssignees((prev) => prev.filter((a) => a.id !== u.id))}
                                                     className="p-1 hover:bg-gray-200 rounded-full text-gray-400"
                                                 >
                                                     <X size={12} />
                                                 </button>
                                             </div>
-                                        ) : null}
+                                        ))}
                                         <button
                                             type="button"
                                             onClick={() => setShowUserDropdown(!showUserDropdown)}
@@ -192,27 +195,30 @@ const AddTodoModal: React.FC<AddTodoModalProps> = ({ isOpen, onClose, getUsersFn
 
                                     {showUserDropdown && (
                                         <div className="absolute top-full left-0 mt-2 w-full bg-white rounded-[20px] shadow-2xl border border-gray-100 p-3 z-10 max-h-[200px] overflow-y-auto custom-scrollbar">
-                                            {users.length > 0 ? users.map(user => (
-                                                <button
-                                                    key={user.id}
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setAssignee(user.name);
-                                                        setShowUserDropdown(false);
-                                                    }}
-                                                    className="w-full flex items-center gap-3 p-3 hover:bg-[#F97171]/5 rounded-xl transition-all text-left group"
-                                                >
-                                                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500 group-hover:bg-[#F97171] group-hover:text-white transition-colors">
-                                                        {user.name.charAt(0).toUpperCase()}
-                                                    </div>
-                                                    <span className="text-sm font-black text-gray-700">{user.name}</span>
-                                                </button>
-                                            )) : (
-                                                <div className="p-3 text-xs text-gray-400 italic">Kayıtlı kullanıcı yok</div>
+                                            {users.filter((u) => !assignees.some((a) => a.id === u.id)).length > 0 ? (
+                                                users.filter((u) => !assignees.some((a) => a.id === u.id)).map((user) => (
+                                                    <button
+                                                        key={user.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setAssignees((prev) => [...prev, { id: user.id, name: user.name }]);
+                                                            setShowUserDropdown(false);
+                                                        }}
+                                                        className="w-full flex items-center gap-3 p-3 hover:bg-[#F97171]/5 rounded-xl transition-all text-left group"
+                                                    >
+                                                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500 group-hover:bg-[#F97171] group-hover:text-white transition-colors">
+                                                            {user.name.charAt(0).toUpperCase()}
+                                                        </div>
+                                                        <span className="text-sm font-black text-gray-700">{user.name}</span>
+                                                    </button>
+                                                ))
+                                            ) : (
+                                                <div className="p-3 text-xs text-gray-400 italic">Eklenecek kullanıcı yok</div>
                                             )}
                                         </div>
                                     )}
                                 </div>
+                                )}
 
                                 {/* Etiketler */}
                                 <TagSelector selectedTagIds={selectedTagIds} onChange={setSelectedTagIds} />

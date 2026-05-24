@@ -1,10 +1,17 @@
 // status: 'todo' | 'in_progress' | 'done'
 // priority: 'low' | 'normal' | 'high' | 'urgent'
+export interface TodoAssignee {
+    id: string;        // User.id (backend) — offline'da local username olabilir
+    name: string | null;
+}
+
 export interface Todo {
     id: string;
     title: string;
     description: string;
-    assignee: string;
+    assignee: string;                  // [legacy/display] ilk atananin adi (geriye donuk uyumluluk)
+    assignees?: TodoAssignee[];        // coklu atama (backend kaynak); offline'da JSON cache
+    createdBy?: string | null;         // gorevi olusturan kullanici id
     due_date?: string;
     priority?: 'low' | 'normal' | 'high' | 'urgent';
     status: 'todo' | 'in_progress' | 'done';
