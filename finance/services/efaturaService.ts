@@ -1,5 +1,5 @@
-import { api } from '../../../services/api';
-import { getDb } from '../../../services/db';
+import { api } from '../../../services/datha/api';
+import { getDb } from '../../../services/datha/db';
 import { CreateEFaturaDTO, EDocumentStatus, EFaturaResponse } from '../../../shared/src';
 
 /**

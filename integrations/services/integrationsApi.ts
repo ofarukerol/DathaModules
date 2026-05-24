@@ -1,7 +1,7 @@
 // Integrations API service — DathaBackend /integrations endpoint'lerine axios wrapper
 // @see DAT-236 Phase 1
 
-import { api } from '../../../services/api';
+import { api } from '../../../services/datha/api';
 import type { IntegrationProvider, IntegrationStatus } from '../../../shared/src';
 
 export interface IntegrationFeatures {
