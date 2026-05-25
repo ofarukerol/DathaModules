@@ -236,55 +236,102 @@ const TodoBoard: React.FC<TodoBoardProps> = ({ currentUserName, getUsersFn }) =>
     // --- Render ---
 
     return (
-        <div className="h-full flex flex-col bg-[#F8F9FB] p-6 lg:p-8 overflow-hidden">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-                <div className="flex items-center gap-4 flex-1 w-full">
-                    <div className="relative flex-1 max-w-md">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+        <div className="h-full flex flex-col bg-[#F8F9FB] overflow-hidden">
+            {/* ── Gradient Page Header ── */}
+            <div
+                className="relative overflow-hidden shrink-0"
+                style={{ background: 'linear-gradient(135deg, #663259 0%, #4A235A 55%, #3d1d4b 100%)' }}
+            >
+                {/* Dekoratif daire */}
+                <div className="absolute -top-12 -right-12 w-52 h-52 rounded-full opacity-10"
+                    style={{ background: 'radial-gradient(circle, #fff 0%, transparent 70%)' }} />
+
+                <div className="relative px-6 lg:px-8 pt-6 pb-4">
+                    {/* Başlık satırı */}
+                    <div className="flex items-center justify-between gap-4 mb-5">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center shrink-0">
+                                <CheckCircle2 size={24} className="text-white" />
+                            </div>
+                            <div>
+                                <h1 className="text-xl font-black text-white leading-tight">Görev Panosu</h1>
+                                <p className="text-white/50 text-xs mt-0.5">
+                                    DathaStaff ile ortak · {todos.length} toplam görev
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2.5 shrink-0">
+                            {/* Görünüm toggle */}
+                            <div className="flex items-center bg-white/10 border border-white/15 rounded-xl p-1">
+                                <button
+                                    onClick={() => setViewMode('kanban')}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                        viewMode === 'kanban' ? 'bg-white text-[#663259]' : 'text-white/70 hover:text-white hover:bg-white/10'
+                                    }`}
+                                >
+                                    <LayoutGrid size={13} />
+                                    Kanban
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('list')}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                        viewMode === 'list' ? 'bg-white text-[#663259]' : 'text-white/70 hover:text-white hover:bg-white/10'
+                                    }`}
+                                >
+                                    <List size={13} />
+                                    Liste
+                                </button>
+                            </div>
+                            <button
+                                onClick={() => setIsAddModalOpen(true)}
+                                className="flex items-center gap-2 bg-white text-[#663259] hover:bg-white/90 px-4 py-2 rounded-xl font-black shadow-lg shadow-black/10 transition-all active:scale-95 text-sm whitespace-nowrap"
+                            >
+                                <Plus size={16} />
+                                Yeni Görev
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Stats satırı */}
+                    <div className="flex items-center gap-3 flex-wrap">
+                        {[
+                            { label: 'Yapılacak', count: counts.todo, dot: 'bg-gray-300', bg: 'bg-white/10' },
+                            { label: 'Devam Eden', count: counts.in_progress, dot: 'bg-amber-400', bg: 'bg-amber-400/20' },
+                            { label: 'Tamamlanan', count: counts.done, dot: 'bg-emerald-400', bg: 'bg-emerald-400/20' },
+                            { label: 'Gecikmiş', count: todos.filter(t => isOverdue(t)).length, dot: 'bg-red-400', bg: 'bg-red-400/20' },
+                        ].map(s => (
+                            <div key={s.label} className={`flex items-center gap-2 px-3 py-1.5 rounded-xl ${s.bg}`}>
+                                <div className={`w-2 h-2 rounded-full ${s.dot}`} />
+                                <span className="text-white font-black text-sm">{s.count}</span>
+                                <span className="text-white/60 text-[11px] font-bold">{s.label}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Search + filter bar — hâlâ header içinde */}
+                <div className="relative px-6 lg:px-8 pb-4">
+                    <div className="relative max-w-sm">
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40" size={15} />
                         <input
                             type="text"
                             placeholder="Görev ara..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-11 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#663259]/20 focus:border-[#663259]/30 transition-all"
+                            className="w-full pl-10 pr-4 py-2.5 bg-white/10 border border-white/15 rounded-xl text-sm text-white placeholder-white/40 outline-none focus:bg-white/15 focus:border-white/30 transition-all"
                         />
                     </div>
-
-                    <div className="flex items-center bg-white border border-gray-200 rounded-xl p-1">
-                        <button
-                            onClick={() => setViewMode('kanban')}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                                viewMode === 'kanban' ? 'bg-[#663259] text-white' : 'text-gray-500 hover:bg-gray-50'
-                            }`}
-                        >
-                            <LayoutGrid size={14} />
-                            Kanban
-                        </button>
-                        <button
-                            onClick={() => setViewMode('list')}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                                viewMode === 'list' ? 'bg-[#663259] text-white' : 'text-gray-500 hover:bg-gray-50'
-                            }`}
-                        >
-                            <List size={14} />
-                            Liste
-                        </button>
-                    </div>
                 </div>
-
-                <button
-                    onClick={() => setIsAddModalOpen(true)}
-                    className="flex items-center gap-2 bg-[#663259] hover:bg-[#4A233C] text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-[#663259]/20 transition-all transform active:scale-95 text-sm whitespace-nowrap"
-                >
-                    <Plus size={18} />
-                    Yeni Görev
-                </button>
             </div>
 
             {/* List view tab filter */}
+
+            {/* Body wrapper */}
+            <div className="flex-1 flex flex-col overflow-hidden px-6 lg:px-8 pt-4 pb-6">
+
+            {/* List view tab filter */}
             {viewMode === 'list' && (
-                <div className="mb-4">
+                <div className="mb-4 shrink-0">
                     <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl p-1 w-fit">
                         {listTabs.map(tab => (
                             <button
@@ -621,6 +668,7 @@ const TodoBoard: React.FC<TodoBoardProps> = ({ currentUserName, getUsersFn }) =>
                     canAssign={canAssign}
                 />
             )}
+            </div>{/* /Body wrapper */}
         </div>
     );
 };

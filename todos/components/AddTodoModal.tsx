@@ -6,14 +6,13 @@ import {
     X,
     AlignLeft,
     Paperclip,
-    Share2,
-    Eye,
     Plus,
     ChevronDown,
     ListTodo
 } from 'lucide-react';
 import DatePicker from './DatePicker';
 import TagSelector from './TagSelector';
+import RichTextEditor from '@/components/RichTextEditor';
 
 interface DBUser {
     id: string;
@@ -88,19 +87,9 @@ const AddTodoModal: React.FC<AddTodoModalProps> = ({ isOpen, onClose, getUsersFn
                             Hazırlık Listesi
                         </div>
                     </div>
-                    <div className="flex items-center gap-6">
-                        <button className="flex items-center gap-2 text-gray-500 hover:text-gray-800 text-sm font-bold transition-colors">
-                            <Share2 size={18} />
-                            Paylaş
-                        </button>
-                        <button className="flex items-center gap-2 text-gray-500 hover:text-gray-800 text-sm font-bold transition-colors">
-                            <Eye size={18} />
-                            İzle
-                        </button>
-                        <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-all text-gray-400 hover:text-gray-600">
-                            <X size={24} />
-                        </button>
-                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-all text-gray-400 hover:text-gray-600">
+                        <X size={24} />
+                    </button>
                 </div>
 
                 {/* Content */}
@@ -125,14 +114,13 @@ const AddTodoModal: React.FC<AddTodoModalProps> = ({ isOpen, onClose, getUsersFn
                                     <AlignLeft size={16} />
                                     Açıklama
                                 </div>
-                                <div className="bg-[#F8F9FA] rounded-[24px] p-6 min-h-[160px] border border-gray-100/50">
-                                    <textarea
-                                        value={description}
-                                        onChange={(e) => setDescription(e.target.value)}
-                                        className="w-full bg-transparent border-none outline-none focus:ring-0 text-gray-600 text-[15px] leading-relaxed resize-none p-0"
-                                        placeholder="Görevin detaylarını buraya yazabilirsiniz..."
-                                    />
-                                </div>
+                                <RichTextEditor
+                                    value={description}
+                                    onChange={setDescription}
+                                    placeholder="Görevin detaylarını buraya yazabilirsiniz..."
+                                    minHeight={160}
+                                    accentColor="#663259"
+                                />
                             </div>
 
                             <div className="space-y-4">
