@@ -21,33 +21,30 @@ function mapLocalToBackendProduct(
     prod: Product,
     backendCategoryId: string,
 ): Record<string, unknown> {
+    // KRITIK: Backend CreateProductDto.forbidNonWhitelisted=true — DTO'da OLMAYAN
+    // alanlar 400 BadRequest firlatir. Asagidaki liste DTO ile birebir uyumludur;
+    // taxRate / price2 / icon / showInKitchen / packageCost / isRecipeProduct /
+    // recipeItems / packagingItems / marketplacePrices / marketplaceCommissions /
+    // loyaltyPointType / loyaltyPointValue / updatedAt — bu alanlar henuz backend
+    // DTO'sunda DESTEKLENMIYOR, sync sirasinda gonderilmez. Backend gelistigi zaman
+    // DTO'ya eklenir ve buraya ekleme yapilabilir.
     const mapped: Record<string, unknown> = {
         name: prod.name,
         categoryId: backendCategoryId,
         price: prod.price,
-        costPrice: prod.purchasePrice ?? undefined,
-        description: prod.description ?? undefined,
-        productCode: prod.sku ?? undefined,
-        isActive: prod.isActive !== false,
-        trackStock: prod.trackStock ?? false,
-        stockQty: prod.stockQuantity ?? 0,
-        sortOrder: 0,
     };
 
-    // Opsiyonel alanlar — sadece tanımlıysa gönder
-    if (prod.taxRate != null) mapped.taxRate = prod.taxRate;
-    if (prod.purchaseTaxRate != null) mapped.purchaseTaxRate = prod.purchaseTaxRate;
-    if (prod.price2 != null) mapped.price2 = prod.price2;
-    if (prod.price3 != null) mapped.price3 = prod.price3;
+    // Opsiyonel — sadece tanimliysa ekle, undefined gondermez (whitelist hatasi olmaz)
+    if (prod.purchasePrice != null) mapped.costPrice = prod.purchasePrice;
+    if (prod.description) mapped.description = prod.description;
+    if (prod.sku) mapped.productCode = prod.sku;
+    if (typeof prod.isActive === 'boolean') mapped.isActive = prod.isActive;
+    if (typeof prod.trackStock === 'boolean') mapped.trackStock = prod.trackStock;
+    if (typeof prod.stockQuantity === 'number') mapped.stockQty = prod.stockQuantity;
     if (prod.criticalStockLevel != null) mapped.criticalStockLevel = prod.criticalStockLevel;
     if (prod.imageUrl) mapped.imageUrl = prod.imageUrl;
-    if (prod.icon) mapped.icon = prod.icon;
-    if (prod.showInKitchen != null) mapped.showInKitchen = prod.showInKitchen;
-    if (prod.packageCost != null) mapped.packageCost = prod.packageCost;
-    if (prod.isRecipeProduct != null) mapped.isRecipeProduct = prod.isRecipeProduct;
-    if (prod.updatedAt) mapped.updatedAt = prod.updatedAt;
 
-    // JSON alanları
+    // Portions: DTO ile uyumlu sekil
     if (prod.portions && prod.portions.length > 0) {
         mapped.portions = prod.portions.map((p) => ({
             name: p.name,
@@ -55,18 +52,6 @@ function mapLocalToBackendProduct(
             price: p.price,
             isDefault: false,
         }));
-    }
-    if (prod.recipeItems && prod.recipeItems.length > 0) {
-        mapped.recipeItems = prod.recipeItems;
-    }
-    if (prod.packagingItems && prod.packagingItems.length > 0) {
-        mapped.packagingItems = prod.packagingItems;
-    }
-    if (prod.marketplacePrices) mapped.marketplacePrices = prod.marketplacePrices;
-    if (prod.marketplaceCommissions) mapped.marketplaceCommissions = prod.marketplaceCommissions;
-    if (prod.loyaltyPointType) {
-        mapped.loyaltyPointType = prod.loyaltyPointType;
-        mapped.loyaltyPointValue = prod.loyaltyPointValue;
     }
 
     return mapped;
