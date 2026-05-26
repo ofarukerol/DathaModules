@@ -243,7 +243,7 @@ export default function WhatsAppSetup() {
                       // Config yoksa: doğrudan OAuth + açık scope
                       // (Dev Mode'da app admin/tester rolündeki kullanıcı için çalışır;
                       //  production'da App Review onayı gerekir)
-                      scope: 'whatsapp_business_management,whatsapp_business_messaging,business_management',
+                      scope: 'whatsapp_business_management,whatsapp_business_messaging',
                       response_type: 'code',
                       override_default_response_type: true,
                       extras: { feature: 'whatsapp_embedded_signup', version: 2 },
