@@ -231,12 +231,23 @@ export default function WhatsAppSetup() {
                         setEmbedStatus('error');
                     });
             },
-            {
-                config_id: FB_CONFIG_ID || undefined,
-                response_type: 'code',
-                override_default_response_type: true,
-                extras: { feature: 'whatsapp_embedded_signup', version: 2 },
-            },
+            FB_CONFIG_ID
+                ? {
+                      // Embedded Signup config (Solution Partner / Tech Provider config_id varsa)
+                      config_id: FB_CONFIG_ID,
+                      response_type: 'code',
+                      override_default_response_type: true,
+                      extras: { feature: 'whatsapp_embedded_signup', version: 2 },
+                  }
+                : {
+                      // Config yoksa: doğrudan OAuth + açık scope
+                      // (Dev Mode'da app admin/tester rolündeki kullanıcı için çalışır;
+                      //  production'da App Review onayı gerekir)
+                      scope: 'whatsapp_business_management,whatsapp_business_messaging,business_management',
+                      response_type: 'code',
+                      override_default_response_type: true,
+                      extras: { feature: 'whatsapp_embedded_signup', version: 2 },
+                  },
         );
     }, [defaultBranchId, minOrderAmount, askPaymentMethod]);
 
