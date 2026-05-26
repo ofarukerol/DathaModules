@@ -4,6 +4,21 @@
 import { api } from '../../../services/datha/api';
 import type { IntegrationProvider, IntegrationStatus } from '../../../shared/src';
 
+// Backend TransformInterceptor tüm response'ları { success, data, meta? } olarak sarmalar.
+// Bu helper idempotent — sarmalanmış gelirse açar, açıkça gelirse aynen döner.
+type ApiEnvelope<T> = { success: boolean; data: T; meta?: unknown };
+function unwrap<T>(payload: T | ApiEnvelope<T>): T {
+    if (
+        payload &&
+        typeof payload === 'object' &&
+        'success' in (payload as object) &&
+        'data' in (payload as object)
+    ) {
+        return (payload as ApiEnvelope<T>).data;
+    }
+    return payload as T;
+}
+
 export interface IntegrationFeatures {
     fetchOrders?: boolean;
     pushStatus?: boolean;
@@ -124,8 +139,8 @@ export interface BranchOption {
 
 export const tenantApi = {
     async getBranches(): Promise<BranchOption[]> {
-        const { data } = await api.get<{ success: boolean; data: BranchOption[] }>('/tenant/me/branches');
-        return data.data;
+        const { data } = await api.get<ApiEnvelope<BranchOption[]> | BranchOption[]>('/tenant/me/branches');
+        return unwrap(data);
     },
 
     async updateWhatsappDefaultBranch(branchId: string | null): Promise<void> {
@@ -135,23 +150,23 @@ export const tenantApi = {
 
 export const integrationsApi = {
     async list(): Promise<IntegrationDto[]> {
-        const { data } = await api.get<IntegrationDto[]>('/integrations');
-        return data;
+        const { data } = await api.get<IntegrationDto[] | ApiEnvelope<IntegrationDto[]>>('/integrations');
+        return unwrap(data);
     },
 
     async get(id: string): Promise<IntegrationDto> {
-        const { data } = await api.get<IntegrationDto>(`/integrations/${id}`);
-        return data;
+        const { data } = await api.get<IntegrationDto | ApiEnvelope<IntegrationDto>>(`/integrations/${id}`);
+        return unwrap(data);
     },
 
     async create(payload: CreateIntegrationPayload): Promise<IntegrationDto> {
-        const { data } = await api.post<IntegrationDto>('/integrations', payload);
-        return data;
+        const { data } = await api.post<IntegrationDto | ApiEnvelope<IntegrationDto>>('/integrations', payload);
+        return unwrap(data);
     },
 
     async update(id: string, payload: UpdateIntegrationPayload): Promise<IntegrationDto> {
-        const { data } = await api.patch<IntegrationDto>(`/integrations/${id}`, payload);
-        return data;
+        const { data } = await api.patch<IntegrationDto | ApiEnvelope<IntegrationDto>>(`/integrations/${id}`, payload);
+        return unwrap(data);
     },
 
     async remove(id: string): Promise<void> {
@@ -159,19 +174,19 @@ export const integrationsApi = {
     },
 
     async test(id: string): Promise<TestConnectionResult> {
-        const { data } = await api.post<TestConnectionResult>(`/integrations/${id}/test`);
-        return data;
+        const { data } = await api.post<TestConnectionResult | ApiEnvelope<TestConnectionResult>>(`/integrations/${id}/test`);
+        return unwrap(data);
     },
 
     // Product mapping (Phase 4)
     async listProductMaps(id: string): Promise<ProductMapsResponse> {
-        const { data } = await api.get<ProductMapsResponse>(`/integrations/${id}/products`);
-        return data;
+        const { data } = await api.get<ProductMapsResponse | ApiEnvelope<ProductMapsResponse>>(`/integrations/${id}/products`);
+        return unwrap(data);
     },
 
     async autoMapProducts(id: string): Promise<AutoMapResult> {
-        const { data } = await api.post<AutoMapResult>(`/integrations/${id}/products/auto-map`);
-        return data;
+        const { data } = await api.post<AutoMapResult | ApiEnvelope<AutoMapResult>>(`/integrations/${id}/products/auto-map`);
+        return unwrap(data);
     },
 
     async mapProduct(
@@ -180,11 +195,11 @@ export const integrationsApi = {
         externalProductId: string,
         opts?: { externalSku?: string; externalName?: string },
     ): Promise<IntegrationProductMapDto> {
-        const { data } = await api.post<IntegrationProductMapDto>(
+        const { data } = await api.post<IntegrationProductMapDto | ApiEnvelope<IntegrationProductMapDto>>(
             `/integrations/${integrationId}/products/${internalProductId}/map`,
             { externalProductId, ...opts },
         );
-        return data;
+        return unwrap(data);
     },
 
     async unmapProduct(integrationId: string, internalProductId: string): Promise<void> {
@@ -192,10 +207,10 @@ export const integrationsApi = {
     },
 
     async pushAllPrices(id: string): Promise<{ queued: number }> {
-        const { data } = await api.post<{ queued: number }>(
+        const { data } = await api.post<{ queued: number } | ApiEnvelope<{ queued: number }>>(
             `/integrations/${id}/sync/push-all-prices`,
         );
-        return data;
+        return unwrap(data);
     },
 };
 
@@ -217,10 +232,10 @@ export interface EmbeddedSignupResult {
 
 export const whatsappOnboardingApi = {
     async completeEmbeddedSignup(payload: EmbeddedSignupPayload): Promise<EmbeddedSignupResult> {
-        const { data } = await api.post<EmbeddedSignupResult>(
+        const { data } = await api.post<EmbeddedSignupResult | ApiEnvelope<EmbeddedSignupResult>>(
             '/integrations/whatsapp/embedded-signup',
             payload,
         );
-        return data;
+        return unwrap(data);
     },
 };
