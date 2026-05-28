@@ -50,6 +50,7 @@ const ProductForm: React.FC = () => {
     const [isTaxExempt, setIsTaxExempt] = useState(false);
     const [showInKitchen, setShowInKitchen] = useState(true);
     const [isRecipeProduct, setIsRecipeProduct] = useState(false);
+    const [isRawMaterial, setIsRawMaterial] = useState(false);
     const [recipeItems, setRecipeItems] = useState<RecipeItem[]>([]);
     const [packagingItems, setPackagingItems] = useState<RecipeItem[]>([]);
     const [recipeTab, setRecipeTab] = useState<'ingredients' | 'packaging'>('ingredients');
@@ -124,6 +125,7 @@ const ProductForm: React.FC = () => {
             setIsTaxExempt((existingProduct.taxRate === 0) && (existingProduct.purchaseTaxRate === 0));
             setShowInKitchen(existingProduct.showInKitchen ?? true);
             setIsRecipeProduct(existingProduct.isRecipeProduct ?? false);
+            setIsRawMaterial(existingProduct.isRawMaterial ?? false);
             setRecipeItems(existingProduct.recipeItems || []);
             formLoadedRef.current = true;
         } else if (!isEditMode) {
@@ -147,9 +149,9 @@ const ProductForm: React.FC = () => {
         if (!name) missingFields.push('Ürün Adı');
         if (!categoryId) missingFields.push('Kategori');
         if (!sku) missingFields.push('Barkod / SKU');
-        if (!taxRate) missingFields.push('KDV Oranı');
+        if (!isRawMaterial && !taxRate) missingFields.push('KDV Oranı');
         const basePrice = portions.length > 0 ? Math.min(...portions.map(p => p.price)) : (parseFloat(price) || 0);
-        if (portions.length === 0 && !parseFloat(price)) missingFields.push('Fiyat 1');
+        if (!isRawMaterial && portions.length === 0 && !parseFloat(price)) missingFields.push('Fiyat 1');
 
         if (missingFields.length > 0) {
             setErrorModal(`Lütfen şu alanları doldurunuz: ${missingFields.join(', ')}`);
@@ -170,6 +172,7 @@ const ProductForm: React.FC = () => {
             stockQuantity: parseFloat(stockQuantity) || 0,
             criticalStockLevel: parseFloat(criticalStockLevel) || 0,
             isRecipeProduct,
+            isRawMaterial,
             recipeItems: isRecipeProduct ? recipeItems : [],
             packagingItems,
             price: basePrice,
@@ -195,7 +198,6 @@ const ProductForm: React.FC = () => {
         };
 
         if (isEditMode && id) {
-            if (!window.confirm('Bu ürünü güncellemek istediğinize emin misiniz?')) return;
             updateProduct(id, productData);
             showSuccess('Ürün başarıyla güncellendi');
         } else {
@@ -272,9 +274,9 @@ const ProductForm: React.FC = () => {
                     className="relative overflow-hidden rounded-2xl shadow-lg shrink-0"
                     style={{ background: 'linear-gradient(135deg, #663259 0%, #4A235A 55%, #3d1d4b 100%)' }}
                 >
-                    <div className="absolute -top-10 -right-10 w-44 h-44 rounded-full opacity-10"
+                    <div className="absolute -top-10 -right-10 w-44 h-44 rounded-full opacity-10 pointer-events-none"
                         style={{ background: 'radial-gradient(circle, #fff 0%, transparent 70%)' }} />
-                    <div className="relative px-6 py-5 flex items-center justify-between gap-4">
+                    <div className="relative z-10 px-6 py-5 flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
                             <div className="flex items-center">
                                 <button
@@ -681,8 +683,9 @@ const ProductForm: React.FC = () => {
                                         </div>
                                     </div>
 
+                                    {!isRawMaterial && (
                                     <div className="space-y-6 bg-slate-900/5 border border-slate-900/10 p-8 rounded-[32px] relative overflow-hidden group">
-                                        <div className="absolute top-0 right-0 w-40 h-40 bg-secondary/10 rounded-full -mr-20 -mt-20 blur-2xl transition-transform group-hover:scale-110"></div>
+                                        <div className="absolute top-0 right-0 w-40 h-40 bg-secondary/10 rounded-full -mr-20 -mt-20 blur-2xl transition-transform group-hover:scale-110 pointer-events-none"></div>
                                         <div className="flex items-center justify-between mb-2">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 bg-secondary/10 text-secondary rounded-2xl flex items-center justify-center">
@@ -747,6 +750,7 @@ const ProductForm: React.FC = () => {
                                             <p className="text-[11px] text-slate-500 font-bold leading-tight">Bu fiyatlar sadece Hızlı Satış ekranında kullanılabilir. Diğer ekranlarda "Fiyat 1" geçerlidir.</p>
                                         </div>
                                     </div>
+                                    )}
                                     <div className="space-y-4">
                                         <label className="block text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Ürün Açıklaması</label>
                                         <textarea
@@ -1252,6 +1256,22 @@ const ProductForm: React.FC = () => {
                                                         </div>
                                                     </div>
                                                 )}
+                                            </div>
+
+                                            {/* Raw Material Toggle */}
+                                            <div className={`flex items-center justify-between px-5 py-4 rounded-3xl border transition-all cursor-pointer ${isRawMaterial ? 'bg-sky-500/5 border-sky-500/20' : 'bg-white border-slate-100 hover:bg-gray-50'}`} onClick={() => setIsRawMaterial(!isRawMaterial)}>
+                                                <div className="flex items-center gap-4">
+                                                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-colors ${isRawMaterial ? 'bg-sky-500/20 text-sky-500' : 'bg-slate-100 text-slate-400'}`}>
+                                                        <span className="material-symbols-outlined">package_2</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-[13px] font-black text-slate-700 tracking-tight block">Hammadde</span>
+                                                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{isRawMaterial ? 'Satışa kapalı, reçetelerde kullanılır' : 'Doğrudan satılabilir ürün'}</span>
+                                                    </div>
+                                                </div>
+                                                <div className={`w-14 h-7 rounded-full relative transition-all duration-300 ${isRawMaterial ? 'bg-sky-500' : 'bg-slate-200'}`}>
+                                                    <div className={`w-5 h-5 rounded-full absolute top-1 shadow-sm transition-all duration-300 ${isRawMaterial ? 'bg-white left-8' : 'bg-white left-1'}`}></div>
+                                                </div>
                                             </div>
 
                                             {/* Recipe Product Toggle */}

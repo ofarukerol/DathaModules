@@ -32,6 +32,7 @@ export interface Product {
     stockQuantity?: number;
     criticalStockLevel?: number;
     isRecipeProduct?: boolean;
+    isRawMaterial?: boolean;
     recipeItems?: RecipeItem[];
     packagingItems?: RecipeItem[];
     imageUrl?: string;
