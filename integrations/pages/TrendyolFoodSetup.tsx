@@ -31,6 +31,8 @@ export default function TrendyolFoodSetup() {
     const [formError, setFormError] = useState<string | null>(null);
 
     const [externalAccountId, setExternalAccountId] = useState('');
+    const [externalStoreId, setExternalStoreId] = useState('');
+    const [executorUser, setExecutorUser] = useState('');
     const [apiKey, setApiKey] = useState('');
     const [apiSecret, setApiSecret] = useState('');
     const [token, setToken] = useState('');
@@ -43,7 +45,8 @@ export default function TrendyolFoodSetup() {
     const isFormValid =
         externalAccountId.trim().length > 0 &&
         apiKey.trim().length > 0 &&
-        apiSecret.trim().length > 0;
+        apiSecret.trim().length > 0 &&
+        executorUser.trim().length > 0;
 
     const handleSubmit = async () => {
         if (!isFormValid) return;
@@ -53,6 +56,8 @@ export default function TrendyolFoodSetup() {
             const created = await createIntegration({
                 provider: providerParam,
                 externalAccountId: externalAccountId.trim(),
+                externalStoreId: externalStoreId.trim() || undefined,
+                executorUser: executorUser.trim(),
                 apiKey: apiKey.trim(),
                 apiSecret: apiSecret.trim(),
                 token: token.trim() || undefined,
@@ -163,6 +168,19 @@ export default function TrendyolFoodSetup() {
                                     value={externalAccountId}
                                     onChange={setExternalAccountId}
                                     required
+                                />
+                                <FormField
+                                    label="İşlem E-postası"
+                                    placeholder="ornek@restoran.com — Trendyol GO zorunlu (x-executor-user)"
+                                    value={executorUser}
+                                    onChange={setExecutorUser}
+                                    required
+                                />
+                                <FormField
+                                    label="Mağaza ID (opsiyonel)"
+                                    placeholder="Ürün/menü eşleştirme için (storeId)"
+                                    value={externalStoreId}
+                                    onChange={setExternalStoreId}
                                 />
                                 <FormField
                                     label="API Key"

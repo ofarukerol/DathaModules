@@ -66,6 +66,10 @@ export interface CreateIntegrationPayload {
     features?: IntegrationFeatures;
     config?: IntegrationConfig;
     pollIntervalSec?: number;
+    /** Trendyol GO Meal x-executor-user header (işlemi yapan kişi/şube email'i — ZORUNLU) */
+    executorUser?: string;
+    /** Trendyol GO Meal x-agentname header (default: SelfIntegration) */
+    agentName?: string;
 }
 
 export interface UpdateIntegrationPayload {
