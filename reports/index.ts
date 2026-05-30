@@ -1,6 +1,7 @@
 // Pages
 export { default as EndOfDay } from './pages/EndOfDay';
 export { default as ProductSales } from './pages/ProductSales';
+export { default as TrendyolSummary } from './pages/TrendyolSummary';
 export { default as Statistics } from './pages/Statistics';
 export { default as Shifts } from './pages/Shifts';
 export { default as Stock } from './pages/Stock';

@@ -216,7 +216,37 @@ export const integrationsApi = {
         );
         return unwrap(data);
     },
+
+    /**
+     * Tarih bazlı Trendyol satış/finans özeti (settlement API).
+     * startDate/endDate: epoch ms.
+     */
+    async getFinanceSummary(
+        id: string,
+        startDate: number,
+        endDate: number,
+    ): Promise<FinanceSummaryDto> {
+        const { data } = await api.get<FinanceSummaryDto | ApiEnvelope<FinanceSummaryDto>>(
+            `/integrations/${id}/finance-summary`,
+            { params: { startDate, endDate } },
+        );
+        return unwrap(data);
+    },
 };
+
+export interface FinanceSummaryDto {
+    startDate: number;
+    endDate: number;
+    totalOrders: number;
+    totalSales: number;
+    totalCommission: number;
+    totalSellerRevenue: number; // Hakediş
+    totalDelivery: number;
+    totalDiscount: number;
+    totalReturn: number;
+    currency: string;
+    error?: string;
+}
 
 // ---------------- WhatsApp Embedded Signup (DAT-145 Item 11) ----------------
 
