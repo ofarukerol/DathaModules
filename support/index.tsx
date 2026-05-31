@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import PageToolbar from '@/components/PageToolbar';
 import { useSupportStore } from './store';
 import { toast } from './toastStore';
 import { liveChatApi, liveChatSocket } from './store';
@@ -718,8 +719,10 @@ const Support: React.FC = () => {
     };
 
     return (
-        <div className="flex-1 flex flex-col bg-[#F3F4F6]">
-            <div className="flex-1 p-5 pt-3 flex flex-col gap-4">
+        <div className="flex-1 flex flex-col bg-gray-50">
+            <div className="flex-1 p-5 pt-4 flex flex-col gap-4">
+
+                <PageToolbar icon="support_agent" title="Destek" stats="Yardım merkezi ve canlı destek" />
 
                 {/* ─── Top Section ─── */}
                 <div className="shrink-0 flex flex-col gap-6">

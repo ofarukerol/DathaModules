@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import CustomSelect from '../../../components/CustomSelect';
 import DatePicker from '../../../components/DatePicker';
+import PageToolbar from '@/components/PageToolbar';
 import { useProductStore } from '../../products';
 import { useCompanyStore } from '../../../stores/useCompanyStore';
 import { useInvoiceStore } from '../stores/useInvoiceStore';
@@ -218,41 +219,29 @@ const InvoiceForm: React.FC = () => {
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-gray-50">
             <div className="flex-1 overflow-hidden p-5 pt-4 flex flex-col gap-4">
-                {/* Header Card */}
-                <div className="flex items-center justify-between bg-white p-3 rounded-2xl shadow-sm border border-gray-100 shrink-0">
-                    <div className="flex items-center gap-3 pl-2">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center`} style={{ backgroundColor: `${accentColor}15` }}>
-                            <span className="material-symbols-outlined text-[20px]" style={{ color: accentColor }}>
-                                {isPurchase ? 'shopping_cart' : 'sell'}
-                            </span>
+                <PageToolbar
+                    icon={isPurchase ? 'shopping_cart' : 'sell'}
+                    title={isPurchase ? 'Alış Faturası Oluştur' : 'Satış Faturası Oluştur'}
+                    stats={company ? company.name : 'Firma bilgisi yükleniyor...'}
+                    backPath="/finance/invoices"
+                    actions={
+                        <div className="flex items-center gap-2.5">
+                            <button
+                                onClick={() => navigate(`/finance/companies/${companyId}`)}
+                                className="px-4 py-2 bg-white/10 border border-white/15 text-white rounded-xl hover:bg-white/20 transition-all font-bold text-sm active:scale-95"
+                            >
+                                İptal
+                            </button>
+                            <button
+                                onClick={handleSave}
+                                className="flex items-center gap-2 px-4 py-2 bg-white text-[#663259] rounded-xl hover:bg-white/90 transition-all font-bold text-sm shadow-sm active:scale-95"
+                            >
+                                <FileText size={18} />
+                                <span>FATURAYI KAYDET</span>
+                            </button>
                         </div>
-                        <div>
-                            <h2 className="text-xl font-bold tracking-tight text-[#1F2937]">
-                                {isPurchase ? 'Alış Faturası Oluştur' : 'Satış Faturası Oluştur'}
-                            </h2>
-                            <p className="text-xs text-[#6B7280] mt-0.5">
-                                {company ? company.name : 'Firma bilgisi yükleniyor...'}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={() => navigate(`/finance/companies/${companyId}`)}
-                            className="px-5 py-3 bg-gray-50 text-gray-500 border border-gray-100 rounded-xl hover:bg-gray-100 hover:text-gray-700 transition-all font-bold text-sm active:scale-95"
-                        >
-                            İptal
-                        </button>
-                        <button
-                            onClick={handleSave}
-                            className="flex items-center gap-2 px-5 py-3 text-white rounded-xl transition-all font-bold text-sm shadow-lg active:scale-95"
-                            style={{ backgroundColor: accentColor }}
-                        >
-                            <FileText size={18} />
-                            <span>FATURAYI KAYDET</span>
-                        </button>
-                    </div>
-                </div>
+                    }
+                />
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
                     <div className="space-y-6">

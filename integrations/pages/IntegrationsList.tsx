@@ -4,7 +4,7 @@
 
 import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import GradientHeader from '../../../components/GradientHeader';
+import PageToolbar from '@/components/PageToolbar';
 import { useIntegrationStore } from '../stores/useIntegrationStore';
 import {
     IntegrationProvider,
@@ -186,23 +186,25 @@ export default function IntegrationsList({ embedded = false, onlyProviders, excl
     }
 
     // Bağımsız tam sayfa modu
+    const toolbarActions = (
+        <button
+            onClick={() => navigate('/finance/marketplaces/new?provider=TRENDYOL_FOOD')}
+            className="flex items-center gap-2 px-4 py-2 bg-white text-[#663259] rounded-xl text-sm font-bold transition-all shadow-sm hover:bg-white/90 active:scale-95"
+        >
+            <span className="material-symbols-outlined text-[18px]">add</span>
+            Yeni Entegrasyon
+        </button>
+    );
+
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-gray-50">
             <div className="flex-1 overflow-hidden p-5 pt-4 flex flex-col gap-4">
-                <GradientHeader
+                <PageToolbar
                     icon="storefront"
                     title="Pazaryerleri"
-                    subtitle={loading ? 'Yükleniyor...' : `${connectedCount} bağlı platform`}
-                >
-                    <button
-                        onClick={() => navigate('/finance/marketplaces/new?provider=TRENDYOL_FOOD')}
-                        className="h-8 flex items-center gap-1.5 px-3.5 rounded-lg text-sm font-semibold text-white transition-all hover:brightness-110"
-                        style={{ background: '#663259' }}
-                    >
-                        <span className="material-symbols-outlined text-[17px]">add</span>
-                        Yeni Entegrasyon
-                    </button>
-                </GradientHeader>
+                    stats={loading ? 'Yükleniyor...' : `${connectedCount} bağlı platform`}
+                    actions={toolbarActions}
+                />
                 <div className="flex-1 overflow-y-auto custom-scrollbar">{body}</div>
             </div>
         </div>

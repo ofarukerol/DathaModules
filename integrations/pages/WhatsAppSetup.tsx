@@ -11,7 +11,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import GradientHeader from '../../../components/GradientHeader';
+import PageToolbar from '@/components/PageToolbar';
 import { useIntegrationStore } from '../stores/useIntegrationStore';
 import {
     IntegrationProvider,
@@ -298,10 +298,11 @@ export default function WhatsAppSetup() {
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-gray-50">
             <div className="flex-1 overflow-hidden p-5 pt-4 flex flex-col gap-4">
-                <GradientHeader
+                <PageToolbar
                     icon="chat"
                     title={`${PROVIDER_LABELS[IntegrationProvider.WHATSAPP]} Entegrasyonu`}
-                    subtitle="Müşterileriniz WhatsApp üzerinden sipariş verebilir"
+                    stats="Müşterileriniz WhatsApp üzerinden sipariş verebilir"
+                    backPath="/finance/marketplaces"
                 />
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar">

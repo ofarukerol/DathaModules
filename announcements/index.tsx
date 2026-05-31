@@ -5,6 +5,7 @@ import {
     ChevronUp, Plus, Sparkles
 } from 'lucide-react';
 import { useAnnouncementStore } from './store';
+import PageToolbar from '@/components/PageToolbar';
 import FeatureRequestModal from './components/FeatureRequestModal';
 import MyFeatureRequestsModal from './components/MyFeatureRequestsModal';
 import SlideDetailModal from './components/SlideDetailModal';
@@ -153,58 +154,34 @@ const Announcements: React.FC<AnnouncementsProps> = ({ currentUserFullName }) =>
         setShowRoadmapDetail(true);
     };
 
+    const toolbarStats = displayAnnouncements.length > 0 || displayRoadmap.length > 0 || displayRequests.length > 0
+        ? [
+            displayAnnouncements.length > 0 && `${displayAnnouncements.length} duyuru`,
+            displayRoadmap.length > 0 && `${displayRoadmap.length} yol haritası`,
+            displayRequests.length > 0 && `${displayRequests.length} talep`,
+          ].filter(Boolean).join(' · ')
+        : 'Gelişmeleri takip edin';
+
+    const toolbarActions = (
+        <button
+            onClick={() => navigate('/support')}
+            className="flex items-center gap-2 px-4 py-2 bg-white text-[#663259] rounded-xl text-sm font-bold transition-all shadow-sm hover:bg-white/90 active:scale-95"
+        >
+            <span className="material-symbols-outlined text-[18px]">support_agent</span>
+            <span className="hidden sm:inline">Destek</span>
+        </button>
+    );
+
     return (
-        <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#F3F4F6] antialiased" style={{ fontFamily: "'Lexend', sans-serif" }}>
+        <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-gray-50">
+            <div className="flex-1 overflow-hidden p-5 pt-4 flex flex-col gap-4">
 
-            {/* Gradient Header */}
-            <div className="px-4 lg:px-6 mt-4 lg:mt-5 shrink-0">
-                <div
-                    className="relative overflow-hidden rounded-2xl shadow-lg"
-                    style={{ background: 'linear-gradient(135deg, #663259 0%, #4A235A 55%, #3d1d4b 100%)' }}
-                >
-                    {/* Dekoratif arka plan dairesi */}
-                    <div
-                        className="absolute -top-10 -right-10 w-44 h-44 rounded-full opacity-10"
-                        style={{ background: 'radial-gradient(circle, #fff 0%, transparent 70%)' }}
-                    />
-
-                    <div className="relative px-5 lg:px-6 py-4 flex items-center justify-between gap-4">
-                        {/* Sol: İkon + Başlık + İstatistik */}
-                        <div className="flex items-center gap-3.5 min-w-0">
-                            <div className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center border border-white/20 shrink-0">
-                                <span className="material-symbols-outlined text-white text-[24px]">campaign</span>
-                            </div>
-                            <div className="min-w-0">
-                                <h1 className="text-base lg:text-lg font-bold text-white leading-tight truncate">
-                                    Duyurular ve Yol Haritası
-                                </h1>
-                                <p className="text-white/55 text-xs mt-0.5">
-                                    {displayAnnouncements.length > 0 || displayRoadmap.length > 0 || displayRequests.length > 0
-                                        ? [
-                                            displayAnnouncements.length > 0 && `${displayAnnouncements.length} duyuru`,
-                                            displayRoadmap.length > 0 && `${displayRoadmap.length} yol haritası`,
-                                            displayRequests.length > 0 && `${displayRequests.length} talep`,
-                                          ].filter(Boolean).join(' · ')
-                                        : 'Gelişmeleri takip edin'}
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Sağ: Destek butonu */}
-                        <div className="flex items-center gap-2 shrink-0">
-                            <button
-                                onClick={() => navigate('/support')}
-                                className="flex items-center gap-1.5 h-9 px-4 rounded-xl bg-white/15 border border-white/20 text-white hover:bg-white/25 transition-all font-medium text-sm"
-                            >
-                                <span className="material-symbols-outlined text-[18px]">support_agent</span>
-                                <span className="hidden sm:inline">Destek</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div className="flex-1 overflow-hidden px-4 lg:px-6 pb-5 pt-4 flex flex-col">
+                <PageToolbar
+                    icon="campaign"
+                    title="Duyurular ve Yol Haritası"
+                    stats={toolbarStats}
+                    actions={toolbarActions}
+                />
 
                 {/* Icerik Alani */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar pr-1">

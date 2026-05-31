@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { useFavoritesStore, CALENDAR_PAGE_INFO, useCalendarStore } from './store';
+import { useCalendarStore } from './store';
 import CustomSelect from './components/CustomSelect';
 import DatePicker from './components/DatePicker';
 import RichTextEditor from './components/RichTextEditor';
 import { useEscapeKey } from '../_shared/useEscapeKey';
 import type { StaffMember, EventFormState } from './types';
 import { uuidv7 } from '@/utils/uuid';
+import PageToolbar from '@/components/PageToolbar';
 
 // Helper functions
 function toDateKey(date: Date): string {
@@ -147,11 +147,7 @@ const DEFAULT_FORM: EventFormState = {
 };
 
 const Calendar: React.FC = () => {
-    const navigate = useNavigate();
-    const location = useLocation();
-    const { toggleFavorite, isFavorite } = useFavoritesStore();
     const { events, addEvent } = useCalendarStore();
-    const isFav = isFavorite(location.pathname);
 
     const [currentDate, setCurrentDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
@@ -230,108 +226,81 @@ const Calendar: React.FC = () => {
         setShowEventModal(false);
     };
 
+    const toolbarActions = (
+        <div className="flex items-center gap-2.5">
+            {/* View Mode Buttons */}
+            <div className="h-10 flex items-center bg-white/10 rounded-xl p-1 border border-white/15">
+                <button
+                    onClick={() => setViewMode('month')}
+                    className={`h-8 px-4 rounded-lg text-sm font-semibold transition-all flex items-center ${
+                        viewMode === 'month'
+                            ? 'bg-white text-[#663259] shadow-sm'
+                            : 'text-white/70 hover:bg-white/10 hover:text-white'
+                    }`}
+                >
+                    Ay
+                </button>
+                <button
+                    onClick={() => setViewMode('week')}
+                    className={`h-8 px-4 rounded-lg text-sm font-semibold transition-all flex items-center ${
+                        viewMode === 'week'
+                            ? 'bg-white text-[#663259] shadow-sm'
+                            : 'text-white/70 hover:bg-white/10 hover:text-white'
+                    }`}
+                >
+                    Hafta
+                </button>
+                <button
+                    onClick={() => setViewMode('day')}
+                    className={`h-8 px-4 rounded-lg text-sm font-semibold transition-all flex items-center ${
+                        viewMode === 'day'
+                            ? 'bg-white text-[#663259] shadow-sm'
+                            : 'text-white/70 hover:bg-white/10 hover:text-white'
+                    }`}
+                >
+                    Gün
+                </button>
+            </div>
+
+            {/* Month Navigator */}
+            <div className="h-10 flex items-center gap-1 bg-white/10 px-2 rounded-xl border border-white/15">
+                <button
+                    onClick={() => navigateMonth(-1)}
+                    className="w-7 h-7 flex items-center justify-center hover:bg-white/10 rounded-lg text-white/60 hover:text-white transition-colors"
+                >
+                    <span className="material-symbols-outlined text-[20px]">chevron_left</span>
+                </button>
+                <span className="font-bold text-white text-sm min-w-[120px] text-center">
+                    {TURKISH_MONTHS[month]} {year}
+                </span>
+                <button
+                    onClick={() => navigateMonth(1)}
+                    className="w-7 h-7 flex items-center justify-center hover:bg-white/10 rounded-lg text-white/60 hover:text-white transition-colors"
+                >
+                    <span className="material-symbols-outlined text-[20px]">chevron_right</span>
+                </button>
+            </div>
+
+            {/* Add Event Button */}
+            <button
+                onClick={() => setShowEventModal(true)}
+                className="h-10 px-5 rounded-xl bg-white text-[#663259] font-bold shadow-sm hover:bg-white/90 active:scale-95 transition-all flex items-center gap-2"
+            >
+                <span className="material-symbols-outlined text-[20px]">add</span>
+                <span className="text-sm">Yeni Etkinlik</span>
+            </button>
+        </div>
+    );
+
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-gray-50">
             <div className="flex-1 overflow-hidden p-5 pt-4 flex flex-col gap-4">
-                {/* Gradient Header */}
-                <div
-                    className="relative overflow-hidden rounded-2xl shadow-lg shrink-0"
-                    style={{ background: 'linear-gradient(135deg, #663259 0%, #4A235A 55%, #3d1d4b 100%)' }}
-                >
-                    <div className="absolute -top-10 -right-10 w-44 h-44 rounded-full opacity-10"
-                        style={{ background: 'radial-gradient(circle, #fff 0%, transparent 70%)' }} />
-                    <div className="relative px-6 py-5 flex items-center justify-between gap-4">
-                        {/* Sol: İkon + Başlık */}
-                        <div className="flex items-center gap-4">
-                            <div className="flex items-center">
-                                <button onClick={() => navigate(-1)} className="h-12 px-2.5 rounded-l-xl bg-white/10 flex items-center justify-center hover:bg-white/20 active:scale-95 transition-all border border-white/15 border-r-0">
-                                    <span className="material-symbols-outlined text-white/70 text-[20px]">arrow_back</span>
-                                </button>
-                                <div className="w-12 h-12 rounded-r-xl bg-white/15 flex items-center justify-center border border-white/20 border-l-white/10">
-                                    <span className="material-symbols-outlined text-white text-[26px]">calendar_month</span>
-                                </div>
-                            </div>
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <h1 className="text-xl font-bold text-white leading-tight">Takvim</h1>
-                                    <button
-                                        onClick={() => toggleFavorite({ path: location.pathname, ...CALENDAR_PAGE_INFO })}
-                                        className={`relative group w-5 h-5 flex items-center justify-center rounded-full transition-all duration-200 hover:scale-125 active:scale-95 ${isFav ? 'text-amber-400' : 'text-white/40 hover:text-amber-400'}`}
-                                    >
-                                        <span className="material-symbols-outlined text-[16px]">{isFav ? 'star' : 'star_border'}</span>
-                                        <span className="absolute -bottom-7 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-gray-800 text-white text-[10px] font-medium rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">{isFav ? 'Favorilerden çıkar' : 'Favorilere ekle'}</span>
-                                    </button>
-                                </div>
-                                <p className="text-white/60 text-xs mt-0.5">Rezervasyonlar ve personel vardiya yönetimi</p>
-                            </div>
-                        </div>
-
-                        {/* Sağ: Eylem butonları */}
-                        <div className="flex items-center gap-2.5 shrink-0">
-                            {/* View Mode Buttons */}
-                            <div className="h-10 flex items-center bg-white/10 rounded-xl p-1 border border-white/15">
-                                <button
-                                    onClick={() => setViewMode('month')}
-                                    className={`h-8 px-4 rounded-lg text-sm font-semibold transition-all flex items-center ${
-                                        viewMode === 'month'
-                                            ? 'bg-white text-[#663259] shadow-sm'
-                                            : 'text-white/70 hover:bg-white/10 hover:text-white'
-                                    }`}
-                                >
-                                    Ay
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('week')}
-                                    className={`h-8 px-4 rounded-lg text-sm font-semibold transition-all flex items-center ${
-                                        viewMode === 'week'
-                                            ? 'bg-white text-[#663259] shadow-sm'
-                                            : 'text-white/70 hover:bg-white/10 hover:text-white'
-                                    }`}
-                                >
-                                    Hafta
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('day')}
-                                    className={`h-8 px-4 rounded-lg text-sm font-semibold transition-all flex items-center ${
-                                        viewMode === 'day'
-                                            ? 'bg-white text-[#663259] shadow-sm'
-                                            : 'text-white/70 hover:bg-white/10 hover:text-white'
-                                    }`}
-                                >
-                                    Gün
-                                </button>
-                            </div>
-
-                            {/* Month Navigator */}
-                            <div className="h-10 flex items-center gap-1 bg-white/10 px-2 rounded-xl border border-white/15">
-                                <button
-                                    onClick={() => navigateMonth(-1)}
-                                    className="w-7 h-7 flex items-center justify-center hover:bg-white/10 rounded-lg text-white/60 hover:text-white transition-colors"
-                                >
-                                    <span className="material-symbols-outlined text-[20px]">chevron_left</span>
-                                </button>
-                                <span className="font-bold text-white text-sm min-w-[120px] text-center">
-                                    {TURKISH_MONTHS[month]} {year}
-                                </span>
-                                <button
-                                    onClick={() => navigateMonth(1)}
-                                    className="w-7 h-7 flex items-center justify-center hover:bg-white/10 rounded-lg text-white/60 hover:text-white transition-colors"
-                                >
-                                    <span className="material-symbols-outlined text-[20px]">chevron_right</span>
-                                </button>
-                            </div>
-
-                            {/* Add Event Button */}
-                            <button
-                                onClick={() => setShowEventModal(true)}
-                                className="h-10 px-5 rounded-xl bg-[#F97171] text-white font-bold shadow-lg shadow-[#F97171]/30 hover:bg-[#E05A5A] hover:-translate-y-0.5 transition-all flex items-center gap-2"
-                            >
-                                <span className="material-symbols-outlined text-[20px]">add</span>
-                                <span className="text-sm">Yeni Etkinlik</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                <PageToolbar
+                    icon="calendar_month"
+                    title="Takvim"
+                    stats="Rezervasyonlar ve personel vardiya yönetimi"
+                    actions={toolbarActions}
+                />
 
                 {/* Main Content */}
                 <div className="flex-1 overflow-hidden flex gap-6 items-start">

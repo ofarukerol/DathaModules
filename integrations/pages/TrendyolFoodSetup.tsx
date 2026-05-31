@@ -9,7 +9,7 @@
 
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import GradientHeader from '../../../components/GradientHeader';
+import PageToolbar from '@/components/PageToolbar';
 import { useIntegrationStore } from '../stores/useIntegrationStore';
 import {
     IntegrationProvider,
@@ -96,10 +96,11 @@ export default function TrendyolFoodSetup() {
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-gray-50">
             <div className="flex-1 overflow-hidden p-5 pt-4 flex flex-col gap-4">
-                <GradientHeader
+                <PageToolbar
                     icon="link"
                     title={`${PROVIDER_LABELS[providerParam]} Entegrasyonu`}
-                    subtitle={`Adım ${step} / 4`}
+                    stats={`Adım ${step} / 4`}
+                    backPath="/finance/marketplaces"
                 />
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar">

@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import GradientHeader from '../../../components/GradientHeader';
+import PageToolbar from '@/components/PageToolbar';
 import { useIntegrationStore } from '../stores/useIntegrationStore';
 import { IntegrationProvider, PROVIDER_LABELS, PROVIDER_COLORS, INTEGRATION_STATUS_LABELS } from '../../../shared/src';
 import WhatsAppDetail from './WhatsAppDetail';
@@ -83,25 +83,29 @@ export default function TrendyolFoodDetail() {
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-gray-50">
             <div className="flex-1 overflow-hidden p-5 pt-4 flex flex-col gap-4">
-                <GradientHeader
+                <PageToolbar
                     icon="storefront"
                     title={PROVIDER_LABELS[integration.provider]}
-                    subtitle={`Durum: ${INTEGRATION_STATUS_LABELS[integration.status]}`}
-                >
-                    <button
-                        onClick={handleTest}
-                        disabled={testing}
-                        className="h-8 px-3.5 rounded-lg text-sm font-semibold text-white bg-white/15 border border-white/20 hover:bg-white/25 disabled:opacity-50"
-                    >
-                        {testing ? 'Test ediliyor...' : 'Bağlantıyı Test Et'}
-                    </button>
-                    <button
-                        onClick={handleDelete}
-                        className="h-8 px-3.5 rounded-lg text-sm font-semibold text-white bg-red-500/80 hover:bg-red-500"
-                    >
-                        Sil
-                    </button>
-                </GradientHeader>
+                    stats={`Durum: ${INTEGRATION_STATUS_LABELS[integration.status]}`}
+                    backPath="/finance/marketplaces"
+                    actions={
+                        <div className="flex items-center gap-2.5">
+                            <button
+                                onClick={handleTest}
+                                disabled={testing}
+                                className="flex items-center gap-2 px-4 py-2 bg-white/10 border border-white/15 text-white rounded-xl text-sm font-semibold transition-all hover:bg-white/20 active:scale-95 disabled:opacity-50"
+                            >
+                                {testing ? 'Test ediliyor...' : 'Bağlantıyı Test Et'}
+                            </button>
+                            <button
+                                onClick={handleDelete}
+                                className="flex items-center gap-2 px-4 py-2 bg-white text-[#663259] rounded-xl text-sm font-bold transition-all shadow-sm hover:bg-white/90 active:scale-95"
+                            >
+                                Sil
+                            </button>
+                        </div>
+                    }
+                />
 
                 {/* Tab bar */}
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-2 py-1.5 inline-flex gap-1 shrink-0 w-fit">
