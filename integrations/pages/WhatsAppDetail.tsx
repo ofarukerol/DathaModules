@@ -131,7 +131,7 @@ function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigat
     };
 
     return (
-        <div className={embedded ? 'h-full overflow-y-auto custom-scrollbar p-6 flex flex-col gap-5' : 'flex-1 overflow-y-auto custom-scrollbar p-5 flex flex-col gap-5'}>
+        <div className={embedded ? 'absolute inset-0 overflow-y-auto custom-scrollbar p-6 flex flex-col gap-5' : 'flex-1 overflow-y-auto custom-scrollbar p-5 flex flex-col gap-5'}>
             {/* Başlık + durum */}
             <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-4">
