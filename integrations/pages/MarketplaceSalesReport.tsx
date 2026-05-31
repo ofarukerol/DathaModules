@@ -117,12 +117,37 @@ export default function MarketplaceSalesReport() {
         }
     }, [connected, integrationId]);
 
+    // Raporu yükle — verilen değerlerle (state async olduğu için preset/Filtrele
+    // güncel değerleri doğrudan geçer; yoksa mevcut state kullanılır).
+    const loadReport = async (opts?: { start?: string; end?: string; include?: boolean; id?: string }) => {
+        const id = opts?.id ?? integrationId;
+        if (!id) return;
+        const sd = opts?.start ?? startDate;
+        const ed = opts?.end ?? endDate;
+        const inc = opts?.include ?? includeOrders;
+        setLoading(true);
+        setError(null);
+        try {
+            const data = await integrationsApi.getSalesReport(id, startOfDayMs(sd), endOfDayMs(ed), inc);
+            setReport(data);
+            if (data.error) setError(data.error);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Rapor alınamadı');
+            setReport(null);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Preset (Bugün/Bu Hafta/Bu Ay): tarihleri ayarla VE anında yükle (Filtrele beklemeden)
     const applyPreset = (p: Exclude<Preset, 'custom'>) => {
         const r = presetRange(p);
+        const inc = daysBetween(r.start, r.end) <= AUTO_LIST_MAX_DAYS;
         setPreset(p);
         setStartDate(r.start);
         setEndDate(r.end);
-        setIncludeOrders(daysBetween(r.start, r.end) <= AUTO_LIST_MAX_DAYS);
+        setIncludeOrders(inc);
+        loadReport({ start: r.start, end: r.end, include: inc });
     };
 
     // Özel tarih değişiminde aralık uzunluğuna göre "siparişleri listele"yi otomatik ayarla
@@ -135,30 +160,9 @@ export default function MarketplaceSalesReport() {
         setIncludeOrders(daysBetween(start, end) <= AUTO_LIST_MAX_DAYS);
     };
 
-    const loadReport = async () => {
-        if (!integrationId) return;
-        setLoading(true);
-        setError(null);
-        try {
-            const data = await integrationsApi.getSalesReport(
-                integrationId,
-                startOfDayMs(startDate),
-                endOfDayMs(endDate),
-                includeOrders,
-            );
-            setReport(data);
-            if (data.error) setError(data.error);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Rapor alınamadı');
-            setReport(null);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     // Entegrasyon seçilince/değişince otomatik yükle
     useEffect(() => {
-        if (integrationId) loadReport();
+        if (integrationId) loadReport({ id: integrationId });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [integrationId]);
 
@@ -374,7 +378,7 @@ export default function MarketplaceSalesReport() {
                                     </div>
                                     <div className="flex items-end">
                                         <button
-                                            onClick={loadReport}
+                                            onClick={() => loadReport()}
                                             disabled={loading}
                                             className="w-full h-[42px] flex items-center justify-center gap-2 rounded-xl bg-[#663259] text-white text-sm font-bold hover:bg-[#7a3d6b] transition-colors disabled:opacity-50"
                                         >
