@@ -232,6 +232,22 @@ export const integrationsApi = {
         );
         return unwrap(data);
     },
+
+    /**
+     * Tarih bazlı pazaryeri satış raporu: finansal özet (settlement) +
+     * sipariş listesi (paketler). startDate/endDate: epoch ms.
+     */
+    async getSalesReport(
+        id: string,
+        startDate: number,
+        endDate: number,
+    ): Promise<SalesReportDto> {
+        const { data } = await api.get<SalesReportDto | ApiEnvelope<SalesReportDto>>(
+            `/integrations/${id}/sales-report`,
+            { params: { startDate, endDate } },
+        );
+        return unwrap(data);
+    },
 };
 
 export interface FinanceSummaryDto {
@@ -245,6 +261,35 @@ export interface FinanceSummaryDto {
     totalDiscount: number;
     totalReturn: number;
     currency: string;
+    error?: string;
+}
+
+export interface SalesReportOrderDto {
+    orderNumber: string;
+    orderId: string;
+    customer: string;
+    totalPrice: number;
+    productCount: number;
+    paymentType: string;
+    status: string;
+    orderDate: number;       // epoch ms (sipariş saati)
+    dueDate: number | null;  // epoch ms (vade/ödeme tarihi)
+}
+
+export interface SalesReportDto {
+    startDate: number;
+    endDate: number;
+    summary: {
+        totalOrders: number;
+        totalSales: number;
+        totalCommission: number;
+        totalSellerRevenue: number; // Hakediş
+        totalDelivery: number;
+        totalDiscount: number;
+        totalReturn: number;
+        currency: string;
+    };
+    orders: SalesReportOrderDto[];
     error?: string;
 }
 
