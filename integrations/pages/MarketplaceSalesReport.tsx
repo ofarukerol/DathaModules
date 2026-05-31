@@ -265,7 +265,9 @@ export default function MarketplaceSalesReport() {
                     }
                 />
 
-                <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-4">
+                {/* Blok düzen (space-y) — flex column DEĞİL: overflow-hidden kartların
+                    flexbox'ta sıkışıp tablolarının kırpılmasını ve scroll'un bozulmasını önler. */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4">
                     {/* Bağlı pazaryeri yoksa */}
                     {!intLoading && connected.length === 0 && (
                         <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
