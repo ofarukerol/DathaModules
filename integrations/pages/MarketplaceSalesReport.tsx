@@ -149,6 +149,13 @@ export default function MarketplaceSalesReport() {
         return Array.from(map.entries());
     }, [filteredOrders]);
 
+    // Toplam Sipariş + Satış doğrudan listeden hesaplanır (tüm siparişler, "Hazırlanıyor" dahil)
+    // — settlement'a değil. Böylece özet kartları aşağıdaki sipariş listesiyle birebir tutulur.
+    const listTotalSales = useMemo(
+        () => filteredOrders.reduce((acc, o) => acc + o.totalPrice, 0),
+        [filteredOrders],
+    );
+
     const provider = useMemo(() => {
         const i = connected.find((x) => x.id === integrationId);
         return i?.provider ?? IntegrationProvider.TRENDYOL_FOOD;
@@ -319,10 +326,15 @@ export default function MarketplaceSalesReport() {
                             {/* Özet kartları */}
                             {s && (
                                 <div>
-                                    <h3 className="text-sm font-bold text-gray-700 mb-2 px-1">Sipariş Kayıtları Özet</h3>
+                                    <h3 className="text-sm font-bold text-gray-700 mb-1 px-1">Sipariş Kayıtları Özet</h3>
+                                    <p className="text-xs text-gray-400 mb-2 px-1">
+                                        Toplam Sipariş ve Satış tüm siparişleri kapsar (Hazırlanıyor dahil). Komisyon,
+                                        taşıma, indirim, iade ve Hakediş yalnızca teslim edilip muhasebeleşen (settlement)
+                                        siparişleri yansıtır.
+                                    </p>
                                     <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
-                                        <MetricCard icon="receipt_long" label="Toplam Sipariş" value={String(s.totalOrders)} color="#663259" />
-                                        <MetricCard icon="payments" label="Toplam Satış" value={formatCurrency(s.totalSales)} color="#10B981" />
+                                        <MetricCard icon="receipt_long" label="Toplam Sipariş" value={String(filteredOrders.length)} color="#663259" />
+                                        <MetricCard icon="payments" label="Toplam Satış" value={formatCurrency(listTotalSales)} color="#10B981" />
                                         <MetricCard icon="percent" label="Platform Komisyonu" value={`-${formatCurrency(s.totalCommission)}`} color="#EF4444" />
                                         <MetricCard icon="local_shipping" label="Taşıma Bedeli" value={`-${formatCurrency(s.totalDelivery)}`} color="#F59E0B" />
                                         <MetricCard icon="sell" label="İndirim" value={`-${formatCurrency(s.totalDiscount)}`} color="#F59E0B" />

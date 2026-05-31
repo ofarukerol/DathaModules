@@ -244,7 +244,8 @@ export const integrationsApi = {
     ): Promise<SalesReportDto> {
         const { data } = await api.get<SalesReportDto | ApiEnvelope<SalesReportDto>>(
             `/integrations/${id}/sales-report`,
-            { params: { startDate, endDate } },
+            // Aylık aralıkta Trendyol'dan yüzlerce paket çekilir; varsayılan 15sn yetmez.
+            { params: { startDate, endDate }, timeout: 60000 },
         );
         return unwrap(data);
     },
