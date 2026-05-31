@@ -241,11 +241,13 @@ export const integrationsApi = {
         id: string,
         startDate: number,
         endDate: number,
+        includeOrders = true,
     ): Promise<SalesReportDto> {
         const { data } = await api.get<SalesReportDto | ApiEnvelope<SalesReportDto>>(
             `/integrations/${id}/sales-report`,
             // Aylık aralıkta Trendyol'dan yüzlerce paket çekilir; varsayılan 15sn yetmez.
-            { params: { startDate, endDate }, timeout: 60000 },
+            // includeOrders=false → sadece özet (hızlı), paket listesi çekilmez.
+            { params: { startDate, endDate, includeOrders }, timeout: 60000 },
         );
         return unwrap(data);
     },
@@ -280,6 +282,8 @@ export interface SalesReportOrderDto {
 export interface SalesReportDto {
     startDate: number;
     endDate: number;
+    /** false → yalnızca özet getirildi, orders boş (uzun aralık optimizasyonu) */
+    ordersIncluded: boolean;
     summary: {
         totalOrders: number;
         totalSales: number;
