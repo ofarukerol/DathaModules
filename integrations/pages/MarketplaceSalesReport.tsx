@@ -55,6 +55,25 @@ const PAYMENT_OPTIONS = [
     { value: 'Kapıda Ödeme', label: 'Kapıda Ödeme', icon: 'local_shipping' },
 ];
 
+// İptal/Tedarik Edilemedi = satış değildir (Trendyol "Geçmiş Siparişler"e saymaz)
+const FAILED_STATUSES = ['İptal', 'Tedarik Edilemedi'];
+const PREPARING_STATUSES = ['Oluşturuldu', 'Hazırlanıyor', 'Hazır', 'Kargoda'];
+
+const STATUS_OPTIONS = [
+    { value: 'active', label: 'Aktif + Tamamlanan', icon: 'check_circle' }, // iptal/tedarik edilemedi hariç
+    { value: 'Teslim Edildi', label: 'Teslim Edildi', icon: 'task_alt' },    // Trendyol "Tamamlandı"
+    { value: 'preparing', label: 'Hazırlanıyor', icon: 'schedule' },
+    { value: 'failed', label: 'İptal / Tedarik Edilemedi', icon: 'cancel' },
+];
+
+// Bir siparişin seçili statü filtresine uyup uymadığı
+function matchesStatusFilter(status: string, filter: string): boolean {
+    if (filter === 'active') return !FAILED_STATUSES.includes(status);
+    if (filter === 'preparing') return PREPARING_STATUSES.includes(status);
+    if (filter === 'failed') return FAILED_STATUSES.includes(status);
+    return status === filter; // 'Teslim Edildi'
+}
+
 export default function MarketplaceSalesReport() {
     const { integrations, loading: intLoading, fetchIntegrations } = useIntegrationStore();
 
@@ -71,6 +90,7 @@ export default function MarketplaceSalesReport() {
     const [startDate, setStartDate] = useState(initial.start);
     const [endDate, setEndDate] = useState(initial.end);
     const [paymentFilter, setPaymentFilter] = useState('all');
+    const [statusFilter, setStatusFilter] = useState('active'); // varsayılan: iptal/tedarik edilemedi hariç
     const [search, setSearch] = useState('');
 
     // Veri state
@@ -126,6 +146,7 @@ export default function MarketplaceSalesReport() {
     // ─── İstemci tarafı filtre (ödeme tipi + arama) ───
     const filteredOrders = useMemo(() => {
         let list = report?.orders ?? [];
+        list = list.filter((o) => matchesStatusFilter(o.status, statusFilter));
         if (paymentFilter !== 'all') list = list.filter((o) => o.paymentType === paymentFilter);
         if (search.trim()) {
             const q = search.trim().toLocaleLowerCase('tr-TR');
@@ -136,7 +157,7 @@ export default function MarketplaceSalesReport() {
             );
         }
         return list;
-    }, [report, paymentFilter, search]);
+    }, [report, paymentFilter, statusFilter, search]);
 
     // ─── Tarihe göre grupla ───
     const grouped = useMemo(() => {
@@ -263,8 +284,8 @@ export default function MarketplaceSalesReport() {
                                     )}
                                 </div>
 
-                                {/* Tarih + ödeme + arama + filtrele */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+                                {/* Tarih + statü + ödeme + arama + filtrele */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-3">
                                     <div>
                                         <label className="text-xs font-bold text-gray-500 mb-1 block">Başlangıç Tarihi</label>
                                         <DatePicker
@@ -279,6 +300,15 @@ export default function MarketplaceSalesReport() {
                                             value={endDate}
                                             onChange={(v) => { setEndDate(v); setPreset('custom'); }}
                                             icon="event"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 mb-1 block">Statü</label>
+                                        <CustomSelect
+                                            options={STATUS_OPTIONS}
+                                            value={statusFilter}
+                                            onChange={setStatusFilter}
+                                            accentColor="#663259"
                                         />
                                     </div>
                                     <div>
@@ -328,9 +358,10 @@ export default function MarketplaceSalesReport() {
                                 <div>
                                     <h3 className="text-sm font-bold text-gray-700 mb-1 px-1">Sipariş Kayıtları Özet</h3>
                                     <p className="text-xs text-gray-400 mb-2 px-1">
-                                        Toplam Sipariş ve Satış tüm siparişleri kapsar (Hazırlanıyor dahil). Komisyon,
-                                        taşıma, indirim, iade ve Hakediş yalnızca teslim edilip muhasebeleşen (settlement)
-                                        siparişleri yansıtır.
+                                        Toplam Sipariş ve Satış seçili statüdeki siparişleri kapsar (varsayılan: iptal /
+                                        tedarik edilemedi hariç). Trendyol panelindeki “Tamamlandı” ile birebir karşılaştırmak
+                                        için Statü = “Teslim Edildi” seçin. Komisyon, taşıma, indirim, iade ve Hakediş yalnızca
+                                        muhasebeleşen (settlement) siparişleri yansıtır; bu yüzden teslim adedinden az olabilir.
                                     </p>
                                     <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
                                         <MetricCard icon="receipt_long" label="Toplam Sipariş" value={String(filteredOrders.length)} color="#663259" />
