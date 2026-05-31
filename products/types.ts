@@ -7,6 +7,7 @@ export interface Product {
     price3?: number;
     category: string;
     description?: string;
+    aiNote?: string; // #6 — AI-only gizli not (WhatsApp botu bilir, müşteriye gösterilmez)
     icon?: string;
     sku?: string;
     isActive?: boolean;

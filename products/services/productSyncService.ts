@@ -37,6 +37,7 @@ function mapLocalToBackendProduct(
     // Opsiyonel — sadece tanimliysa ekle, undefined gondermez (whitelist hatasi olmaz)
     if (prod.purchasePrice != null) mapped.costPrice = prod.purchasePrice;
     if (prod.description) mapped.description = prod.description;
+    if (prod.aiNote) mapped.aiNote = prod.aiNote; // #6 — AI-only gizli not
     if (prod.sku) mapped.productCode = prod.sku;
     if (typeof prod.isActive === 'boolean') mapped.isActive = prod.isActive;
     if (typeof prod.trackStock === 'boolean') mapped.trackStock = prod.trackStock;

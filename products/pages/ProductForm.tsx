@@ -21,6 +21,7 @@ const ProductForm: React.FC = () => {
     const [categoryId, setCategoryId] = useState('');
     const [sku, setSku] = useState('');
     const [description, setDescription] = useState('');
+    const [aiNote, setAiNote] = useState(''); // #6 — AI-only gizli not
     const [portions, setPortions] = useState<Portion[]>([]);
     const [price, setPrice] = useState('0');
     const [purchasePrice, setPurchasePrice] = useState('0');
@@ -99,6 +100,7 @@ const ProductForm: React.FC = () => {
             setCategoryId(existingProduct.category);
             setSku(existingProduct.sku || '');
             setDescription(existingProduct.description || '');
+            setAiNote(existingProduct.aiNote || '');
             setPortions(existingProduct.portions || []);
             setPrice(existingProduct.price?.toString() || '0');
             setPurchasePrice(existingProduct.purchasePrice?.toString() || '0');
@@ -163,6 +165,7 @@ const ProductForm: React.FC = () => {
             category: categoryId,
             sku,
             description,
+            aiNote: aiNote.trim() || undefined,
             portions,
             icon,
             imageUrl: imageUrl || undefined,
@@ -760,6 +763,22 @@ const ProductForm: React.FC = () => {
                                             value={description}
                                             onChange={(e) => setDescription(e.target.value)}
                                         ></textarea>
+                                    </div>
+                                    {/* #6 — AI-only gizli not: WhatsApp botu bilir, müşteriye gösterilmez */}
+                                    <div className="space-y-4">
+                                        <label className="flex items-center gap-1.5 text-xs font-black text-slate-400 uppercase tracking-widest ml-1">
+                                            <span className="material-symbols-outlined text-base">smart_toy</span>
+                                            Yapay Zekâ Notu (gizli)
+                                        </label>
+                                        <textarea
+                                            className="form-input !rounded-3xl min-h-[100px] resize-none"
+                                            placeholder="WhatsApp botunun bilmesini istediğin ama müşteriye açıklamada göstermek istemediğin detaylar. Örn: gramaj, acılık, hazırlık süresi, glutensiz mi, vb."
+                                            rows={3}
+                                            maxLength={2000}
+                                            value={aiNote}
+                                            onChange={(e) => setAiNote(e.target.value)}
+                                        ></textarea>
+                                        <p className="text-[11px] text-slate-400 ml-1">Bu metin müşteriye gösterilmez; yalnızca WhatsApp asistanı ilgili soruda kullanır.</p>
                                     </div>
                                     {/* Porsiyon bölümü şu an pasif - ileride açılabilir */}
                                     {false && hasPortion && (
