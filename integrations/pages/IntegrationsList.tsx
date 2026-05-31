@@ -42,9 +42,11 @@ interface IntegrationsListProps {
     embedded?: boolean;
     /** Sadece belirtilen provider'ları göster (örn ['TRENDYOL_FOOD']) — boşsa hepsi */
     onlyProviders?: IntegrationProvider[];
+    /** Belirtilen provider'ları gizle (örn ['WHATSAPP']) — WhatsApp ayrı sekmede gösterilir */
+    excludeProviders?: IntegrationProvider[];
 }
 
-export default function IntegrationsList({ embedded = false, onlyProviders }: IntegrationsListProps = {}) {
+export default function IntegrationsList({ embedded = false, onlyProviders, excludeProviders }: IntegrationsListProps = {}) {
     const navigate = useNavigate();
     const { integrations, loading, error, fetchIntegrations } = useIntegrationStore();
 
@@ -54,13 +56,13 @@ export default function IntegrationsList({ embedded = false, onlyProviders }: In
 
     const rows = useMemo<ProviderRow[]>(() => {
         const providers = (Object.values(IntegrationProvider) as IntegrationProvider[]).filter(
-            (p) => !onlyProviders || onlyProviders.includes(p),
+            (p) => (!onlyProviders || onlyProviders.includes(p)) && (!excludeProviders || !excludeProviders.includes(p)),
         );
         return providers.map((provider) => ({
             provider,
             integration: integrations.find((i) => i.provider === provider) ?? null,
         }));
-    }, [integrations, onlyProviders]);
+    }, [integrations, onlyProviders, excludeProviders]);
 
     const connectedCount = rows.filter((r) => r.integration?.status === 'CONNECTED').length;
     const pendingCount = rows.filter(
