@@ -11,7 +11,6 @@ export { default as InvoiceForm } from './pages/InvoiceForm';
 export { default as Checks } from './pages/Checks';
 export { default as IncomeExpense } from './pages/IncomeExpense';
 export { default as FinanceCategories } from './pages/FinanceCategories';
-export { default as Marketplaces } from './pages/Marketplaces';
 export { default as OrderDetail } from './pages/OrderDetail';
 export { default as EBelgeler } from './pages/EBelgeler';
 

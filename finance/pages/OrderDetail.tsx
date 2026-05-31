@@ -92,7 +92,7 @@ const MarketplaceDetail: React.FC = () => {
                     <span className="material-symbols-outlined text-6xl text-gray-300 mb-4">error</span>
                     <p className="text-gray-500">Pazaryeri bulunamadı</p>
                     <button
-                        onClick={() => navigate('/finance/marketplaces')}
+                        onClick={() => navigate('/finance/banks')}
                         className="mt-4 px-4 py-2 bg-[#663259] text-white rounded-xl font-bold"
                     >
                         Geri Dön
@@ -108,7 +108,7 @@ const MarketplaceDetail: React.FC = () => {
             <header className="h-24 flex items-center justify-between px-8 py-6 relative z-10 shrink-0 bg-white shadow-sm">
                 <div className="flex items-center gap-4">
                     <button
-                        onClick={() => navigate('/finance/marketplaces')}
+                        onClick={() => navigate('/finance/banks')}
                         className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
                     >
                         <span className="material-symbols-outlined text-gray-600">arrow_back</span>
