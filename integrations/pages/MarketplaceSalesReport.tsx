@@ -4,7 +4,7 @@
 // @see DAT-236 — backend GET /integrations/:id/sales-report
 
 import { useEffect, useMemo, useState } from 'react';
-import GradientHeader from '../../../components/GradientHeader';
+import PageToolbar from '../../../components/PageToolbar';
 import CustomSelect from '../../../components/CustomSelect';
 import DatePicker from '../../../components/DatePicker';
 import { formatCurrency } from '../../../utils/datha/helpers';
@@ -185,25 +185,25 @@ export default function MarketplaceSalesReport() {
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-gray-50">
             <div className="flex-1 overflow-hidden p-5 pt-4 flex flex-col gap-4">
-                <GradientHeader
+                <PageToolbar
                     icon="storefront"
                     title="Pazaryeri Satışları"
-                    subtitle={
+                    stats={
                         connected.length === 0
                             ? 'Bağlı pazaryeri yok'
                             : `${PROVIDER_LABELS[provider]} · ${startDate} → ${endDate}`
                     }
-                >
-                    <button
-                        onClick={downloadCsv}
-                        disabled={!filteredOrders.length}
-                        className="h-8 flex items-center gap-1.5 px-3.5 rounded-lg text-sm font-semibold text-white transition-all hover:brightness-110 disabled:opacity-40"
-                        style={{ background: '#10B981' }}
-                    >
-                        <span className="material-symbols-outlined text-[17px]">download</span>
-                        Gün Sonu Raporu İndir
-                    </button>
-                </GradientHeader>
+                    actions={
+                        <button
+                            onClick={downloadCsv}
+                            disabled={!filteredOrders.length}
+                            className="flex items-center gap-2 px-4 py-2 bg-white text-[#663259] rounded-xl text-sm font-bold transition-all shadow-sm hover:bg-white/90 active:scale-95 disabled:opacity-40 disabled:hover:bg-white"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">download</span>
+                            Gün Sonu Raporu İndir
+                        </button>
+                    }
+                />
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-4">
                     {/* Bağlı pazaryeri yoksa */}
