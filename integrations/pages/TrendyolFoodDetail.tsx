@@ -5,7 +5,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import GradientHeader from '../../../components/GradientHeader';
 import { useIntegrationStore } from '../stores/useIntegrationStore';
-import { PROVIDER_LABELS, PROVIDER_COLORS, INTEGRATION_STATUS_LABELS } from '../../../shared/src';
+import { IntegrationProvider, PROVIDER_LABELS, PROVIDER_COLORS, INTEGRATION_STATUS_LABELS } from '../../../shared/src';
+import WhatsAppDetail from './WhatsAppDetail';
 import {
     integrationsApi,
     type IntegrationDto,
@@ -44,6 +45,11 @@ export default function TrendyolFoodDetail() {
                 <p className="text-sm text-gray-500">Entegrasyon yükleniyor veya bulunamadı...</p>
             </div>
         );
+    }
+
+    // WhatsApp pazaryeri değil — kendi detay panelini kullan (Trendyol etiketleri uymaz)
+    if (integration.provider === IntegrationProvider.WHATSAPP) {
+        return <WhatsAppDetail />;
     }
 
     const colors = PROVIDER_COLORS[integration.provider];
