@@ -37,7 +37,12 @@ const SETUP_ROUTE_BY_PROVIDER: Record<IntegrationProvider, string> = {
     WHATSAPP: '/finance/marketplaces/whatsapp-setup',
 };
 
-export default function IntegrationsList() {
+interface IntegrationsListProps {
+    /** true → Ayarlar > Tanımlamalar paneli içine gömülü render (GradientHeader'sız) */
+    embedded?: boolean;
+}
+
+export default function IntegrationsList({ embedded = false }: IntegrationsListProps) {
     const navigate = useNavigate();
     const { integrations, loading, error, fetchIntegrations } = useIntegrationStore();
 
@@ -65,63 +70,26 @@ export default function IntegrationsList() {
         }
     };
 
-    return (
-        <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-gray-50">
-            <div className="flex-1 overflow-hidden p-5 pt-4 flex flex-col gap-4">
-                <GradientHeader
-                    icon="storefront"
-                    title="Pazaryerleri"
-                    subtitle={loading ? 'Yükleniyor...' : `${connectedCount} bağlı platform`}
-                >
-                    <button
-                        onClick={() => navigate('/finance/marketplaces/new?provider=TRENDYOL_FOOD')}
-                        className="h-8 flex items-center gap-1.5 px-3.5 rounded-lg text-sm font-semibold text-white transition-all hover:brightness-110"
-                        style={{ background: '#663259' }}
-                    >
-                        <span className="material-symbols-outlined text-[17px]">add</span>
-                        Yeni Entegrasyon
-                    </button>
-                </GradientHeader>
+    // Özet + kart grid'i (her iki modda ortak)
+    const body = (
+        <>
+            {error && (
+                <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+                    {error}
+                </div>
+            )}
+            <div className={embedded ? 'flex flex-col gap-6' : 'max-w-7xl mx-auto flex flex-col gap-6'}>
+                {/* Özet */}
+                <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+                    <SummaryCard icon="check_circle" label="Bağlı Platform" value={`${connectedCount} / ${rows.length}`} color="emerald" />
+                    <SummaryCard icon="hourglass_top" label="Beklemede / Hata" value={`${pendingCount}`} color="amber" />
+                    <SummaryCard icon="link_off" label="Bağlı Değil" value={`${rows.length - connectedCount - pendingCount}`} color="gray" />
+                    <SummaryCard icon="settings" label="Toplam Platform" value={`${rows.length}`} color="purple" />
+                </div>
 
-                {error && (
-                    <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
-                        {error}
-                    </div>
-                )}
-
-                <div className="flex-1 overflow-y-auto custom-scrollbar">
-                    <div className="max-w-7xl mx-auto flex flex-col gap-6">
-                        {/* Özet */}
-                        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-                            <SummaryCard
-                                icon="check_circle"
-                                label="Bağlı Platform"
-                                value={`${connectedCount} / ${rows.length}`}
-                                color="emerald"
-                            />
-                            <SummaryCard
-                                icon="hourglass_top"
-                                label="Beklemede / Hata"
-                                value={`${pendingCount}`}
-                                color="amber"
-                            />
-                            <SummaryCard
-                                icon="link_off"
-                                label="Bağlı Değil"
-                                value={`${rows.length - connectedCount - pendingCount}`}
-                                color="gray"
-                            />
-                            <SummaryCard
-                                icon="settings"
-                                label="Toplam Platform"
-                                value={`${rows.length}`}
-                                color="purple"
-                            />
-                        </div>
-
-                        {/* Kart grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                            {rows.map((row) => {
+                {/* Kart grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                    {rows.map((row) => {
                                 const colors = PROVIDER_COLORS[row.provider];
                                 const status = row.integration?.status ?? IntegrationStatus.DISCONNECTED;
                                 const style = STATUS_STYLE[status];
@@ -183,7 +151,52 @@ export default function IntegrationsList() {
                             })}
                         </div>
                     </div>
+            </>
+    );
+
+    // Ayarlar > Tanımlamalar içine gömülü mod (GradientHeader yerine kompakt başlık)
+    if (embedded) {
+        return (
+            <div className="flex flex-col h-full">
+                <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                    <div>
+                        <h3 className="text-lg font-bold text-gray-800 font-sans">Pazaryeri Entegrasyonları</h3>
+                        <p className="text-sm text-gray-500 font-sans">
+                            {loading ? 'Yükleniyor...' : `${connectedCount} bağlı platform`}
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => navigate('/finance/marketplaces/new?provider=TRENDYOL_FOOD')}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-[#663259] text-white text-sm font-bold rounded-xl hover:bg-[#7a3d6b] transition-colors shadow-sm"
+                    >
+                        <span className="material-symbols-outlined text-[18px]">add</span>
+                        Yeni Entegrasyon
+                    </button>
                 </div>
+                <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">{body}</div>
+            </div>
+        );
+    }
+
+    // Bağımsız tam sayfa modu
+    return (
+        <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-gray-50">
+            <div className="flex-1 overflow-hidden p-5 pt-4 flex flex-col gap-4">
+                <GradientHeader
+                    icon="storefront"
+                    title="Pazaryerleri"
+                    subtitle={loading ? 'Yükleniyor...' : `${connectedCount} bağlı platform`}
+                >
+                    <button
+                        onClick={() => navigate('/finance/marketplaces/new?provider=TRENDYOL_FOOD')}
+                        className="h-8 flex items-center gap-1.5 px-3.5 rounded-lg text-sm font-semibold text-white transition-all hover:brightness-110"
+                        style={{ background: '#663259' }}
+                    >
+                        <span className="material-symbols-outlined text-[17px]">add</span>
+                        Yeni Entegrasyon
+                    </button>
+                </GradientHeader>
+                <div className="flex-1 overflow-y-auto custom-scrollbar">{body}</div>
             </div>
         </div>
     );

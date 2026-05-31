@@ -129,7 +129,7 @@ const TrendyolSummary: React.FC = () => {
                     <div className="flex-1 flex items-center justify-center text-gray-400 flex-col gap-3">
                         <span className="material-symbols-outlined text-[48px]">storefront</span>
                         <p className="text-sm">Trendyol Yemek entegrasyonu bulunamadı</p>
-                        <p className="text-xs text-gray-400">Ayarlar &gt; Entegrasyonlar &gt; Trendyol Yemek'ten bağlantı kurun</p>
+                        <p className="text-xs text-gray-400">Ayarlar &gt; Tanımlamalar &gt; Pazaryeri'nden bağlantı kurun</p>
                     </div>
                 ) : data?.error ? (
                     <div className="flex-1 flex items-center justify-center text-gray-400 flex-col gap-3">
