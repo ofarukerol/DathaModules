@@ -87,6 +87,24 @@ function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigat
     const [askPaymentMethod, setAskPaymentMethod] = useState<boolean>(config.askPaymentMethod !== false);
     const [savingBot, setSavingBot] = useState(false);
 
+    // #3 — mağaza özel bilgisi (serbest metin → AI prompt'una gider)
+    const [businessInfo, setBusinessInfo] = useState<string>(typeof config.businessInfo === 'string' ? config.businessInfo : '');
+    const [savingInfo, setSavingInfo] = useState(false);
+
+    const saveBusinessInfo = async () => {
+        setSavingInfo(true);
+        try {
+            await onUpdate(integration.id, {
+                config: { ...config, businessInfo: businessInfo.trim() },
+            });
+            addToast('success', 'Mağaza bilgisi kaydedildi');
+        } catch (err) {
+            addToast('error', err instanceof Error ? err.message : 'Kaydedilemedi');
+        } finally {
+            setSavingInfo(false);
+        }
+    };
+
     // Token güncelleme
     const [newToken, setNewToken] = useState('');
     const [savingToken, setSavingToken] = useState(false);
@@ -218,6 +236,32 @@ function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigat
                         className="self-start px-5 py-2.5 rounded-xl bg-[#663259] text-white font-bold text-sm disabled:opacity-50 hover:shadow-lg hover:shadow-[#663259]/20"
                     >
                         {savingBot ? 'Kaydediliyor...' : 'Ayarları Kaydet'}
+                    </button>
+                </div>
+            </Card>
+
+            {/* #3 — Mağaza özel bilgisi (AI bu metni müşteri sorularında kullanır) */}
+            <Card title="Mağaza Bilgisi" icon="store">
+                <p className="text-sm text-gray-600 mb-3">
+                    Bot'un müşteri sorularında kullanacağı serbest bilgi. Adres, kampanya, teslimat bölgesi,
+                    sık sorulan notlar vb. yazabilirsiniz. Bot bu metinden cevaplar; burada olmayan bilgiyi uydurmaz.
+                </p>
+                <textarea
+                    value={businessInfo}
+                    onChange={(e) => setBusinessInfo(e.target.value)}
+                    rows={5}
+                    maxLength={2000}
+                    placeholder={'Örn: Adresimiz Atatürk Mah. 5. Sok. No:3. Teslimat sadece merkez ilçeye. Min. sipariş 50₺. Salı günleri %10 indirim.'}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-[#663259] focus:ring-1 focus:ring-[#663259] outline-none resize-y"
+                />
+                <div className="flex items-center justify-between mt-2">
+                    <span className="text-xs text-gray-400">{businessInfo.length}/2000</span>
+                    <button
+                        onClick={saveBusinessInfo}
+                        disabled={savingInfo}
+                        className="px-5 py-2.5 rounded-xl bg-[#663259] text-white font-bold text-sm disabled:opacity-50 hover:shadow-lg hover:shadow-[#663259]/20"
+                    >
+                        {savingInfo ? 'Kaydediliyor...' : 'Bilgiyi Kaydet'}
                     </button>
                 </div>
             </Card>
