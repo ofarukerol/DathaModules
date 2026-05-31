@@ -417,11 +417,13 @@ export default function MarketplaceSalesReport() {
                                             accentColor="#663259"
                                         />
                                     </div>
-                                    <div className="flex items-end">
+                                    <div className="flex flex-col">
+                                        {/* Görünmez label: butonun üstünü select kutularıyla hizalar */}
+                                        <label className="text-xs font-bold mb-1 block select-none invisible" aria-hidden>Filtrele</label>
                                         <button
                                             onClick={() => loadReport()}
                                             disabled={loading}
-                                            className="w-full h-[42px] flex items-center justify-center gap-2 rounded-xl bg-[#663259] text-white text-sm font-bold hover:bg-[#7a3d6b] transition-colors disabled:opacity-50"
+                                            className="w-full flex-1 min-h-[48px] flex items-center justify-center gap-2 rounded-xl bg-[#663259] text-white text-sm font-bold hover:bg-[#7a3d6b] transition-colors disabled:opacity-50"
                                         >
                                             <span className="material-symbols-outlined text-[18px]">
                                                 {loading ? 'progress_activity' : 'filter_alt'}
@@ -447,22 +449,22 @@ export default function MarketplaceSalesReport() {
                                             <>
                                                 Toplam Sipariş ve Satış seçili statüdeki siparişleri kapsar (varsayılan: iptal /
                                                 tedarik edilemedi hariç). Trendyol panelindeki “Tamamlandı” ile birebir karşılaştırmak
-                                                için Statü = “Teslim Edildi” seçin. Komisyon, taşıma, indirim, iade ve Hakediş yalnızca
+                                                için Statü = “Teslim Edildi” seçin. Komisyon, indirim, iade ve Hakediş yalnızca
                                                 muhasebeleşen (settlement) siparişleri yansıtır; bu yüzden teslim adedinden az olabilir.
+                                                Platform komisyonu taşıma bedelini de içerir (Trendyol API’si ikisini ayrı vermez).
                                             </>
                                         ) : (
                                             <>
                                                 Yalnızca özet getirildi (sipariş listesi çekilmedi). Bu rakamlar muhasebeleşen
-                                                (settlement) siparişleri yansıtır. Sipariş kayıtlarını görmek için “Siparişleri
-                                                listele”yi işaretleyip Filtrele’ye basın.
+                                                (settlement) siparişleri yansıtır. Platform komisyonu taşıma bedelini de içerir.
+                                                Sipariş kayıtlarını görmek için “Siparişleri listele”yi işaretleyip Filtrele’ye basın.
                                             </>
                                         )}
                                     </p>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
+                                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
                                         <MetricCard icon="receipt_long" label="Toplam Sipariş" value={String(summaryOrderCount)} color="#663259" />
                                         <MetricCard icon="payments" label="Toplam Satış" value={formatCurrency(summarySales)} color="#10B981" />
                                         <MetricCard icon="percent" label="Platform Komisyonu" value={`-${formatCurrency(s.totalCommission)}`} color="#EF4444" />
-                                        <MetricCard icon="local_shipping" label="Taşıma Bedeli" value={`-${formatCurrency(s.totalDelivery)}`} color="#F59E0B" />
                                         <MetricCard icon="sell" label="İndirim" value={`-${formatCurrency(s.totalDiscount)}`} color="#F59E0B" />
                                         <MetricCard icon="undo" label="İade" value={`-${formatCurrency(s.totalReturn)}`} color="#EF4444" />
                                         <MetricCard icon="account_balance_wallet" label="Hakediş" value={formatCurrency(s.totalSellerRevenue)} color="#663259" highlight />
