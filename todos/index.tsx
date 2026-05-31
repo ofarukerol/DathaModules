@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useTodoStore } from './store';
+import { connectTodoSocket, disconnectTodoSocket } from './socket';
 import { todoService } from './service';
 import { Todo, Tag } from './types';
 import AddTodoModal from './components/AddTodoModal';
@@ -84,6 +85,8 @@ const TodoBoard: React.FC<TodoBoardProps> = ({ currentUserName, getUsersFn }) =>
 
     useEffect(() => {
         fetchTodos();
+        connectTodoSocket();
+        return () => disconnectTodoSocket();
     }, []);
 
     useEffect(() => {
