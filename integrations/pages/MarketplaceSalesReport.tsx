@@ -3,7 +3,7 @@
 // finansal özet (settlement) + tarih-gruplı sipariş tablosu.
 // @see DAT-236 — backend GET /integrations/:id/sales-report
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import PageToolbar from '../../../components/PageToolbar';
 import CustomSelect from '../../../components/CustomSelect';
 import DatePicker from '../../../components/DatePicker';
@@ -97,6 +97,8 @@ export default function MarketplaceSalesReport() {
     const [paymentFilter, setPaymentFilter] = useState('all');
     const [statusFilter, setStatusFilter] = useState('active'); // varsayılan: iptal/tedarik edilemedi hariç
     const [search, setSearch] = useState('');
+    const [searchOpen, setSearchOpen] = useState(false);
+    const searchRef = useRef<HTMLInputElement>(null);
     // Siparişleri listele: kısa aralıkta varsayılan açık, uzun aralıkta kapalı (yalnızca özet)
     const [includeOrders, setIncludeOrders] = useState(true);
 
@@ -298,20 +300,61 @@ export default function MarketplaceSalesReport() {
                                             {label}
                                         </button>
                                     ))}
-                                    {connected.length > 1 && (
-                                        <div className="ml-auto w-56">
-                                            <CustomSelect
-                                                options={connected.map((i) => ({
-                                                    value: i.id,
-                                                    label: PROVIDER_LABELS[i.provider],
-                                                }))}
-                                                value={integrationId}
-                                                onChange={setIntegrationId}
-                                                icon={<span className="material-symbols-outlined text-[18px]">storefront</span>}
-                                                accentColor="#663259"
+                                    <div className="ml-auto flex items-center gap-2">
+                                        {/* Genişleyen arama: ikon → tıklayınca açılır */}
+                                        <div
+                                            className={`flex items-center h-10 rounded-xl border transition-all duration-300 overflow-hidden ${
+                                                searchOpen ? 'w-64 bg-white border-[#663259] shadow-sm' : 'w-10 bg-gray-100 border-transparent'
+                                            }`}
+                                        >
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const next = !searchOpen;
+                                                    setSearchOpen(next);
+                                                    if (next) setTimeout(() => searchRef.current?.focus(), 50);
+                                                }}
+                                                className="w-10 h-10 flex items-center justify-center shrink-0 text-gray-500 hover:text-[#663259] transition-colors"
+                                                title="Sipariş no / müşteri ara"
+                                            >
+                                                <span className="material-symbols-outlined text-[20px]">search</span>
+                                            </button>
+                                            <input
+                                                ref={searchRef}
+                                                value={search}
+                                                onChange={(e) => setSearch(e.target.value)}
+                                                onBlur={() => { if (!search) setSearchOpen(false); }}
+                                                placeholder="Sipariş no / müşteri..."
+                                                className={`bg-transparent outline-none text-sm text-gray-700 transition-all duration-300 ${
+                                                    searchOpen ? 'w-full opacity-100' : 'w-0 opacity-0'
+                                                }`}
                                             />
+                                            {searchOpen && search && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setSearch(''); searchRef.current?.focus(); }}
+                                                    className="px-2 shrink-0 text-gray-400 hover:text-gray-600"
+                                                    title="Temizle"
+                                                >
+                                                    <span className="material-symbols-outlined text-[18px]">close</span>
+                                                </button>
+                                            )}
                                         </div>
-                                    )}
+                                        {connected.length > 1 && (
+                                            <div className="w-56">
+                                                <CustomSelect
+                                                    options={connected.map((i) => ({
+                                                        value: i.id,
+                                                        label: PROVIDER_LABELS[i.provider],
+                                                    }))}
+                                                    value={integrationId}
+                                                    onChange={setIntegrationId}
+                                                    icon={<span className="material-symbols-outlined text-[18px]">storefront</span>}
+                                                    accentColor="#663259"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {/* Siparişleri listele toggle */}
@@ -328,8 +371,8 @@ export default function MarketplaceSalesReport() {
                                     </span>
                                 </label>
 
-                                {/* Tarih + statü + ödeme + arama + filtrele */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-3">
+                                {/* Tarih + statü + ödeme + filtrele (arama yukarıda ikon olarak) */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
                                     <div>
                                         <label className="text-xs font-bold text-gray-500 mb-1 block">Başlangıç Tarihi</label>
                                         <DatePicker
@@ -363,18 +406,6 @@ export default function MarketplaceSalesReport() {
                                             onChange={setPaymentFilter}
                                             accentColor="#663259"
                                         />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-bold text-gray-500 mb-1 block">Ara (Sipariş No / Müşteri)</label>
-                                        <div className="relative">
-                                            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">search</span>
-                                            <input
-                                                value={search}
-                                                onChange={(e) => setSearch(e.target.value)}
-                                                placeholder="Ara..."
-                                                className="w-full h-[42px] pl-10 pr-3 rounded-xl border border-gray-200 text-sm focus:border-[#663259] focus:ring-1 focus:ring-[#663259] outline-none"
-                                            />
-                                        </div>
                                     </div>
                                     <div className="flex items-end">
                                         <button
