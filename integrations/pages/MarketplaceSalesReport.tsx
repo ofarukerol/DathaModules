@@ -23,7 +23,7 @@ const daysBetween = (startStr: string, endStr: string) =>
 // Bu süreden uzun aralıkta sipariş listesi (paketler) varsayılan olarak çekilmez — yavaş.
 const AUTO_LIST_MAX_DAYS = 7;
 
-type Preset = 'today' | 'week' | 'month' | 'custom';
+type Preset = 'today' | 'week' | 'month' | 'lastMonth' | 'custom';
 
 function presetRange(preset: Exclude<Preset, 'custom'>): { start: string; end: string } {
     const now = new Date();
@@ -35,7 +35,14 @@ function presetRange(preset: Exclude<Preset, 'custom'>): { start: string; end: s
         monday.setDate(now.getDate() - (day - 1));
         return { start: toDateStr(monday), end: today };
     }
-    // month
+    if (preset === 'lastMonth') {
+        // Önceki takvim ayının tamamı (örn. 1 Haziran'da → 1-31 Mayıs)
+        const firstThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const lastPrev = new Date(firstThisMonth.getFullYear(), firstThisMonth.getMonth(), 0); // önceki ayın son günü
+        const firstPrev = new Date(lastPrev.getFullYear(), lastPrev.getMonth(), 1);
+        return { start: toDateStr(firstPrev), end: toDateStr(lastPrev) };
+    }
+    // month → bu ayın 1'i → bugün
     const first = new Date(now.getFullYear(), now.getMonth(), 1);
     return { start: toDateStr(first), end: today };
 }
@@ -289,6 +296,7 @@ export default function MarketplaceSalesReport() {
                                         ['today', 'Bugün'],
                                         ['week', 'Bu Hafta'],
                                         ['month', 'Bu Ay'],
+                                        ['lastMonth', 'Geçen Ay'],
                                     ] as Array<[Exclude<Preset, 'custom'>, string]>).map(([key, label]) => (
                                         <button
                                             key={key}
