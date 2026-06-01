@@ -500,8 +500,8 @@ export default function MarketplaceSalesReport() {
                                     <p className="mt-2 text-sm">Seçili kriterlerde sipariş bulunamadı.</p>
                                 </div>
                             ) : (
-                                grouped.map(([date, orders]) => (
-                                    <DayGroup key={date} date={date} orders={orders} />
+                                grouped.map(([date, orders], idx) => (
+                                    <DayGroup key={date} date={date} orders={orders} defaultExpanded={idx === 0} />
                                 ))
                             )}
                         </>
@@ -520,8 +520,8 @@ const PAGE_SIZE_OPTIONS = [
     { value: '100', label: '100 Adet' },
 ];
 
-function DayGroup({ date, orders }: { date: string; orders: SalesReportOrderDto[] }) {
-    const [expanded, setExpanded] = useState(true);
+function DayGroup({ date, orders, defaultExpanded = false }: { date: string; orders: SalesReportOrderDto[]; defaultExpanded?: boolean }) {
+    const [expanded, setExpanded] = useState(defaultExpanded);
     const [pageSize, setPageSize] = useState('10');
     const [page, setPage] = useState(1);
 
