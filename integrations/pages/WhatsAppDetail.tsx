@@ -11,6 +11,8 @@ import { IntegrationProvider, PROVIDER_COLORS } from '../../../shared/src';
 import type { IntegrationDto, UpdateIntegrationPayload } from '../services/integrationsApi';
 import { useToastStore } from '../../../stores/useToastStore';
 import MapPickerModal from '@/components/modals/MapPickerModal';
+import CustomSelect from '@/components/CustomSelect';
+import { aiKeysApi, type AiProviderKey, type TenantAiKeyDto } from '../services/aiKeysApi';
 
 // Backend sabit verify token (env WHATSAPP_VERIFY_TOKEN). Meta'ya bu değer girilir.
 const BACKEND_VERIFY_TOKEN = 'datha-webhook-verify';
@@ -162,6 +164,95 @@ function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigat
         }
     };
 
+    // ── DAT-145 — Yapay Zeka sağlayıcı (OpenAI + Gemini) key yönetimi ──
+    // Key'ler ayrı endpoint'te (şifreli DB); tercih edilen provider config'te.
+    const [openaiKey, setOpenaiKey] = useState('');      // boş = değiştirme
+    const [openaiModel, setOpenaiModel] = useState('gpt-4o-mini');
+    const [openaiMasked, setOpenaiMasked] = useState('');
+    const [geminiKey, setGeminiKey] = useState('');
+    const [geminiModel, setGeminiModel] = useState('gemini-1.5-flash');
+    const [geminiMasked, setGeminiMasked] = useState('');
+    const [aiPreferred, setAiPreferred] = useState<AiProviderKey>(
+        config.aiPreferredProvider === 'GOOGLE' ? 'GOOGLE' : 'OPENAI',
+    );
+    const [savingAi, setSavingAi] = useState(false);
+    const [testingProvider, setTestingProvider] = useState<AiProviderKey | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        aiKeysApi.list().then((keys) => {
+            if (cancelled) return;
+            const apply = (k: TenantAiKeyDto) => {
+                if (k.provider === 'OPENAI') {
+                    setOpenaiMasked(k.apiKeyMasked);
+                    setOpenaiModel(k.modelName || 'gpt-4o-mini');
+                } else if (k.provider === 'GOOGLE') {
+                    setGeminiMasked(k.apiKeyMasked);
+                    setGeminiModel(k.modelName || 'gemini-1.5-flash');
+                }
+            };
+            keys.forEach(apply);
+        }).catch(() => { /* key yoksa sessizce boş kalır */ });
+        return () => { cancelled = true; };
+    }, []);
+
+    const saveAiSettings = async () => {
+        // Hiç key yokken (ne kayıtlı ne yeni) yalnızca model değiştirmek anlamsız —
+        // backend'de korunacak key olmadığından sessizce kaybolurdu. Kullanıcıyı uyar.
+        const openaiActionable = !!(openaiKey.trim() || openaiMasked);
+        const geminiActionable = !!(geminiKey.trim() || geminiMasked);
+        if (!openaiActionable && !geminiActionable) {
+            addToast('error', 'En az bir sağlayıcı için API anahtarı girin (OpenAI veya Gemini).');
+            return;
+        }
+        setSavingAi(true);
+        try {
+            // Key'ler ayrı endpoint'e (boş bırakılan korunur). Kayıtlı key varsa
+            // sadece model güncellenir.
+            if (openaiActionable) {
+                await aiKeysApi.upsert('OPENAI', {
+                    apiKey: openaiKey.trim() || undefined,
+                    modelName: openaiModel.trim() || 'gpt-4o-mini',
+                });
+            }
+            if (geminiActionable) {
+                await aiKeysApi.upsert('GOOGLE', {
+                    apiKey: geminiKey.trim() || undefined,
+                    modelName: geminiModel.trim() || 'gemini-1.5-flash',
+                });
+            }
+            // Tercih edilen sağlayıcı → config
+            await onUpdate(integration.id, {
+                config: { ...latestConfig(), aiPreferredProvider: aiPreferred },
+            });
+            // Girilen ham key'leri state'ten temizle, maskeyi tazele
+            const fresh = await aiKeysApi.list();
+            fresh.forEach((k) => {
+                if (k.provider === 'OPENAI') setOpenaiMasked(k.apiKeyMasked);
+                if (k.provider === 'GOOGLE') setGeminiMasked(k.apiKeyMasked);
+            });
+            setOpenaiKey('');
+            setGeminiKey('');
+            addToast('success', 'Yapay zeka ayarları kaydedildi');
+        } catch (err) {
+            addToast('error', err instanceof Error ? err.message : 'Kaydedilemedi');
+        } finally {
+            setSavingAi(false);
+        }
+    };
+
+    const testAiProvider = async (provider: AiProviderKey) => {
+        setTestingProvider(provider);
+        try {
+            const res = await aiKeysApi.test(provider);
+            addToast(res.success ? 'success' : 'error', res.message);
+        } catch (err) {
+            addToast('error', err instanceof Error ? err.message : 'Test başarısız');
+        } finally {
+            setTestingProvider(null);
+        }
+    };
+
     // Token güncelleme
     const [newToken, setNewToken] = useState('');
     const [savingToken, setSavingToken] = useState(false);
@@ -293,6 +384,107 @@ function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigat
                         className="self-start px-5 py-2.5 rounded-xl bg-[#663259] text-white font-bold text-sm disabled:opacity-50 hover:shadow-lg hover:shadow-[#663259]/20"
                     >
                         {savingBot ? 'Kaydediliyor...' : 'Ayarları Kaydet'}
+                    </button>
+                </div>
+            </Card>
+
+            {/* DAT-145 — Yapay Zeka sağlayıcı (OpenAI + Gemini), fallback ile */}
+            <Card title="Yapay Zeka Sağlayıcı" icon="psychology">
+                <p className="text-sm text-gray-600 mb-4">
+                    Botun kullanacağı yapay zeka anahtarları. Kendi OpenAI ve Google (Gemini) API
+                    anahtarınızı girin. Tercih edilen sağlayıcı önce denenir; hata/limit olursa
+                    bot otomatik diğerine geçer (kesintisiz yanıt). Anahtarlar şifreli saklanır,
+                    bir daha açık gösterilmez.
+                </p>
+
+                {/* OpenAI */}
+                <div className="rounded-xl border border-gray-100 p-4 mb-3">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="font-bold text-sm text-gray-800">OpenAI (GPT)</span>
+                        {openaiMasked && (
+                            <span className="text-xs text-gray-400 font-mono">{openaiMasked}</span>
+                        )}
+                    </div>
+                    <input
+                        type="password"
+                        value={openaiKey}
+                        onChange={(e) => setOpenaiKey(e.target.value)}
+                        placeholder={openaiMasked ? 'Yeni anahtar (değiştirmek için)' : 'sk-...'}
+                        className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-mono focus:border-[#663259] focus:ring-1 focus:ring-[#663259] outline-none mb-2"
+                    />
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="text"
+                            value={openaiModel}
+                            onChange={(e) => setOpenaiModel(e.target.value)}
+                            placeholder="gpt-4o-mini"
+                            className="flex-1 rounded-xl border border-gray-200 px-4 py-2 text-sm focus:border-[#663259] focus:ring-1 focus:ring-[#663259] outline-none"
+                        />
+                        <button
+                            onClick={() => testAiProvider('OPENAI')}
+                            disabled={testingProvider === 'OPENAI' || !openaiMasked}
+                            title={!openaiMasked ? 'Önce anahtarı kaydedin, sonra test edin' : 'Kayıtlı anahtarı test et'}
+                            className="px-4 py-2 rounded-xl bg-gray-100 text-gray-700 text-sm font-bold hover:bg-gray-200 disabled:opacity-40 transition-colors whitespace-nowrap"
+                        >
+                            {testingProvider === 'OPENAI' ? 'Test...' : 'Test Et'}
+                        </button>
+                    </div>
+                </div>
+
+                {/* Gemini */}
+                <div className="rounded-xl border border-gray-100 p-4 mb-3">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="font-bold text-sm text-gray-800">Google (Gemini)</span>
+                        {geminiMasked && (
+                            <span className="text-xs text-gray-400 font-mono">{geminiMasked}</span>
+                        )}
+                    </div>
+                    <input
+                        type="password"
+                        value={geminiKey}
+                        onChange={(e) => setGeminiKey(e.target.value)}
+                        placeholder={geminiMasked ? 'Yeni anahtar (değiştirmek için)' : 'AIza...'}
+                        className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-mono focus:border-[#663259] focus:ring-1 focus:ring-[#663259] outline-none mb-2"
+                    />
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="text"
+                            value={geminiModel}
+                            onChange={(e) => setGeminiModel(e.target.value)}
+                            placeholder="gemini-1.5-flash"
+                            className="flex-1 rounded-xl border border-gray-200 px-4 py-2 text-sm focus:border-[#663259] focus:ring-1 focus:ring-[#663259] outline-none"
+                        />
+                        <button
+                            onClick={() => testAiProvider('GOOGLE')}
+                            disabled={testingProvider === 'GOOGLE' || !geminiMasked}
+                            title={!geminiMasked ? 'Önce anahtarı kaydedin, sonra test edin' : 'Kayıtlı anahtarı test et'}
+                            className="px-4 py-2 rounded-xl bg-gray-100 text-gray-700 text-sm font-bold hover:bg-gray-200 disabled:opacity-40 transition-colors whitespace-nowrap"
+                        >
+                            {testingProvider === 'GOOGLE' ? 'Test...' : 'Test Et'}
+                        </button>
+                    </div>
+                </div>
+
+                {/* Tercih edilen sağlayıcı */}
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Tercih Edilen Sağlayıcı (önce denenir)</label>
+                <CustomSelect
+                    options={[
+                        { value: 'OPENAI', label: 'OpenAI (GPT)', icon: 'smart_toy' },
+                        { value: 'GOOGLE', label: 'Google (Gemini)', icon: 'auto_awesome' },
+                    ]}
+                    value={aiPreferred}
+                    onChange={(v) => setAiPreferred(v as AiProviderKey)}
+                    placeholder="Sağlayıcı seçin"
+                    accentColor="#663259"
+                />
+
+                <div className="flex justify-end mt-4">
+                    <button
+                        onClick={saveAiSettings}
+                        disabled={savingAi}
+                        className="px-5 py-2.5 rounded-xl bg-[#663259] text-white font-bold text-sm disabled:opacity-50 hover:shadow-lg hover:shadow-[#663259]/20"
+                    >
+                        {savingAi ? 'Kaydediliyor...' : 'Yapay Zeka Ayarlarını Kaydet'}
                     </button>
                 </div>
             </Card>
