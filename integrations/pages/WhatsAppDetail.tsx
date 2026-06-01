@@ -10,6 +10,7 @@ import { useIntegrationStore } from '../stores/useIntegrationStore';
 import { IntegrationProvider, PROVIDER_COLORS } from '../../../shared/src';
 import type { IntegrationDto, UpdateIntegrationPayload } from '../services/integrationsApi';
 import { useToastStore } from '../../../stores/useToastStore';
+import MapPickerModal from '@/components/modals/MapPickerModal';
 
 // Backend sabit verify token (env WHATSAPP_VERIFY_TOKEN). Meta'ya bu değer girilir.
 const BACKEND_VERIFY_TOKEN = 'datha-webhook-verify';
@@ -83,6 +84,17 @@ function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigat
     const addToast = useToastStore((s) => s.addToast);
     const config = (integration.config ?? {}) as Record<string, unknown>;
 
+    // Kaydetme anında store'daki EN GÜNCEL config'i baz al — bu sayfada birden
+    // fazla bağımsız "Kaydet" butonu var (bot ayarı / mağaza bilgisi / konum);
+    // render-anı config closure'ı bayatsa, başka bir handler'ın az önce yazdığını
+    // ezmeyi önler.
+    const latestConfig = (): Record<string, unknown> => {
+        const fresh = useIntegrationStore
+            .getState()
+            .integrations.find((i) => i.id === integration.id);
+        return ((fresh?.config ?? config) ?? {}) as Record<string, unknown>;
+    };
+
     const isConnected = integration.status === 'CONNECTED';
 
     // Bot ayarları (config'den)
@@ -98,13 +110,55 @@ function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigat
         setSavingInfo(true);
         try {
             await onUpdate(integration.id, {
-                config: { ...config, businessInfo: businessInfo.trim() },
+                config: { ...latestConfig(), businessInfo: businessInfo.trim() },
             });
             addToast('success', 'Mağaza bilgisi kaydedildi');
         } catch (err) {
             addToast('error', err instanceof Error ? err.message : 'Kaydedilemedi');
         } finally {
             setSavingInfo(false);
+        }
+    };
+
+    // Konum (haritadan seçilen pin) + Google Haritalar yorum linki
+    const [locationLat, setLocationLat] = useState<string>(
+        config.locationLatitude != null ? String(config.locationLatitude) : '',
+    );
+    const [locationLng, setLocationLng] = useState<string>(
+        config.locationLongitude != null ? String(config.locationLongitude) : '',
+    );
+    const [googleReviewUrl, setGoogleReviewUrl] = useState<string>(
+        typeof config.googleReviewUrl === 'string' ? config.googleReviewUrl : '',
+    );
+    const [mapOpen, setMapOpen] = useState(false);
+    const [savingLocation, setSavingLocation] = useState(false);
+
+    const hasLocation = locationLat.trim() !== '' && locationLng.trim() !== '';
+
+    const saveLocation = async () => {
+        const url = googleReviewUrl.trim();
+        // URL girildiyse http(s) doğrula — bot bunu müşteriye gönderecek.
+        if (url && !/^https?:\/\//i.test(url)) {
+            addToast('error', 'Google yorum linki http:// veya https:// ile başlamalı');
+            return;
+        }
+        setSavingLocation(true);
+        try {
+            const lat = locationLat.trim() === '' ? null : Number(locationLat);
+            const lng = locationLng.trim() === '' ? null : Number(locationLng);
+            await onUpdate(integration.id, {
+                config: {
+                    ...latestConfig(),
+                    locationLatitude: lat,
+                    locationLongitude: lng,
+                    googleReviewUrl: url,
+                },
+            });
+            addToast('success', 'Konum ve yorum linki kaydedildi');
+        } catch (err) {
+            addToast('error', err instanceof Error ? err.message : 'Kaydedilemedi');
+        } finally {
+            setSavingLocation(false);
         }
     };
 
@@ -116,7 +170,7 @@ function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigat
         setSavingBot(true);
         try {
             await onUpdate(integration.id, {
-                config: { ...config, minOrderAmount, askPaymentMethod },
+                config: { ...latestConfig(), minOrderAmount, askPaymentMethod },
             });
             addToast('success', 'Bot ayarları kaydedildi');
         } catch (err) {
@@ -269,6 +323,63 @@ function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigat
                 </div>
             </Card>
 
+            {/* #2 — Konum (haritadan pin) + Google Haritalar yorum linki */}
+            <Card title="Konum & Google Yorum" icon="pin_drop">
+                <p className="text-sm text-gray-600 mb-4">
+                    Müşteri "neredesiniz / konum" sorduğunda bot, aşağıda seçtiğiniz pinli konumu WhatsApp konumu
+                    olarak gönderir. Google yorum linki tanımlıysa, konumla birlikte değerlendirme daveti de iletir.
+                </p>
+
+                {/* Harita konumu */}
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Restoran Konumu</label>
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <button
+                        onClick={() => setMapOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 text-white font-bold text-sm hover:bg-emerald-600 transition-colors"
+                    >
+                        <span className="material-symbols-outlined text-[18px]">map</span>
+                        {hasLocation ? 'Konumu Haritadan Değiştir' : 'Haritadan Konum Seç'}
+                    </button>
+                    {hasLocation && (
+                        <span className="inline-flex items-center gap-1.5 text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 font-mono">
+                            <span className="material-symbols-outlined text-[16px] text-emerald-500">location_on</span>
+                            {Number(locationLat).toFixed(6)}, {Number(locationLng).toFixed(6)}
+                        </span>
+                    )}
+                    {hasLocation && (
+                        <button
+                            onClick={() => { setLocationLat(''); setLocationLng(''); }}
+                            className="text-sm text-red-500 hover:text-red-600 font-medium px-2"
+                        >
+                            Temizle
+                        </button>
+                    )}
+                </div>
+
+                {/* Google yorum linki */}
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mt-4 mb-2">Google Haritalar Yorum Linki</label>
+                <input
+                    type="url"
+                    value={googleReviewUrl}
+                    onChange={(e) => setGoogleReviewUrl(e.target.value)}
+                    placeholder="https://g.page/r/..../review veya https://maps.app.goo.gl/..."
+                    className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-[#663259] focus:ring-1 focus:ring-[#663259] outline-none"
+                />
+                <p className="text-xs text-gray-400 mt-1.5">
+                    Google İşletme Profili → "Daha fazla yorum al" bağlantısını yapıştırın. Müşteriye konumla birlikte gönderilir.
+                </p>
+
+                <div className="flex justify-end mt-3">
+                    <button
+                        onClick={saveLocation}
+                        disabled={savingLocation}
+                        className="px-5 py-2.5 rounded-xl bg-[#663259] text-white font-bold text-sm disabled:opacity-50 hover:shadow-lg hover:shadow-[#663259]/20"
+                    >
+                        {savingLocation ? 'Kaydediliyor...' : 'Konum & Linki Kaydet'}
+                    </button>
+                </div>
+            </Card>
+
             {/* Webhook bilgisi */}
             <Card title="Webhook Bilgisi" icon="webhook">
                 <p className="text-sm text-gray-600 mb-3">
@@ -282,6 +393,15 @@ function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigat
 
             {/* Ek bölüm — ürün açıklamaları listesi (Ayarlar > WhatsApp altında) */}
             {children}
+
+            {/* Haritadan konum seçici */}
+            <MapPickerModal
+                isOpen={mapOpen}
+                onClose={() => setMapOpen(false)}
+                initialLat={locationLat || undefined}
+                initialLng={locationLng || undefined}
+                onSelect={(lat, lng) => { setLocationLat(lat); setLocationLng(lng); }}
+            />
         </div>
     );
 }
