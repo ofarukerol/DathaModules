@@ -23,6 +23,9 @@ const daysBetween = (startStr: string, endStr: string) =>
 // Bu süreden uzun aralıkta sipariş listesi (paketler) varsayılan olarak çekilmez — yavaş.
 const AUTO_LIST_MAX_DAYS = 7;
 
+// Taşıma bedeli Trendyol API'sinde ayrı dönmez → toplam satışın %25'i ile TAHMİN edilir.
+const ESTIMATED_DELIVERY_RATE = 0.25;
+
 type Preset = 'today' | 'week' | 'month' | 'lastMonth' | 'custom';
 
 function presetRange(preset: Exclude<Preset, 'custom'>): { start: string; end: string } {
@@ -451,20 +454,21 @@ export default function MarketplaceSalesReport() {
                                                 tedarik edilemedi hariç). Trendyol panelindeki “Tamamlandı” ile birebir karşılaştırmak
                                                 için Statü = “Teslim Edildi” seçin. Komisyon, indirim, iade ve Hakediş yalnızca
                                                 muhasebeleşen (settlement) siparişleri yansıtır; bu yüzden teslim adedinden az olabilir.
-                                                Platform komisyonu taşıma bedelini de içerir (Trendyol API’si ikisini ayrı vermez).
+                                                Taşıma Bedeli, Trendyol API’sinde ayrı dönmediğinden toplam satışın %25’i ile TAHMİN edilir.
                                             </>
                                         ) : (
                                             <>
                                                 Yalnızca özet getirildi (sipariş listesi çekilmedi). Bu rakamlar muhasebeleşen
-                                                (settlement) siparişleri yansıtır. Platform komisyonu taşıma bedelini de içerir.
+                                                (settlement) siparişleri yansıtır. Taşıma Bedeli toplam satışın %25’i ile tahmin edilir.
                                                 Sipariş kayıtlarını görmek için “Siparişleri listele”yi işaretleyip Filtrele’ye basın.
                                             </>
                                         )}
                                     </p>
-                                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+                                    <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
                                         <MetricCard icon="receipt_long" label="Toplam Sipariş" value={String(summaryOrderCount)} color="#663259" />
                                         <MetricCard icon="payments" label="Toplam Satış" value={formatCurrency(summarySales)} color="#10B981" />
                                         <MetricCard icon="percent" label="Platform Komisyonu" value={`-${formatCurrency(s.totalCommission)}`} color="#EF4444" />
+                                        <MetricCard icon="local_shipping" label="Taşıma Bedeli" value={`-${formatCurrency(summarySales * ESTIMATED_DELIVERY_RATE)}`} color="#F59E0B" estimated />
                                         <MetricCard icon="sell" label="İndirim" value={`-${formatCurrency(s.totalDiscount)}`} color="#F59E0B" />
                                         <MetricCard icon="undo" label="İade" value={`-${formatCurrency(s.totalReturn)}`} color="#EF4444" />
                                         <MetricCard icon="account_balance_wallet" label="Hakediş" value={formatCurrency(s.totalSellerRevenue)} color="#663259" highlight />
@@ -647,24 +651,40 @@ interface MetricCardProps {
     value: string;
     color: string;
     highlight?: boolean;
+    /** Tahmini veri → "bu veri tahmini veridir" uyarısı gösterir */
+    estimated?: boolean;
 }
 
-function MetricCard({ icon, label, value, color, highlight }: MetricCardProps) {
+function MetricCard({ icon, label, value, color, highlight, estimated }: MetricCardProps) {
     return (
         <div
-            className={`rounded-2xl border p-4 shadow-sm ${highlight ? 'border-transparent text-white' : 'bg-white border-gray-100'}`}
-            style={highlight ? { background: `linear-gradient(135deg, ${color} 0%, #4A235A 100%)` } : undefined}
+            className={`relative rounded-2xl border p-4 shadow-sm ${
+                estimated ? 'bg-amber-50/60 border-amber-200' : highlight ? 'border-transparent text-white' : 'bg-white border-gray-100'
+            }`}
+            style={highlight && !estimated ? { background: `linear-gradient(135deg, ${color} 0%, #4A235A 100%)` } : undefined}
         >
+            {estimated && (
+                <span
+                    className="absolute top-2 right-2 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 text-[9px] font-bold uppercase tracking-wide"
+                    title="Bu veri tahmini veridir (sipariş tutarının %25'i)"
+                >
+                    <span className="material-symbols-outlined text-[11px]">info</span>
+                    Tahmini
+                </span>
+            )}
             <div
                 className="w-9 h-9 rounded-xl flex items-center justify-center mb-2"
-                style={{ backgroundColor: highlight ? 'rgba(255,255,255,0.18)' : `${color}1A` }}
+                style={{ backgroundColor: highlight && !estimated ? 'rgba(255,255,255,0.18)' : `${color}1A` }}
             >
-                <span className="material-symbols-outlined text-[20px]" style={{ color: highlight ? '#fff' : color }}>
+                <span className="material-symbols-outlined text-[20px]" style={{ color: highlight && !estimated ? '#fff' : color }}>
                     {icon}
                 </span>
             </div>
-            <p className={`text-xs font-medium ${highlight ? 'text-white/70' : 'text-gray-500'}`}>{label}</p>
-            <p className={`text-lg font-bold mt-0.5 ${highlight ? 'text-white' : 'text-gray-800'}`}>{value}</p>
+            <p className={`text-xs font-medium ${highlight && !estimated ? 'text-white/70' : 'text-gray-500'}`}>{label}</p>
+            <p className={`text-lg font-bold mt-0.5 ${highlight && !estimated ? 'text-white' : 'text-gray-800'}`}>{value}</p>
+            {estimated && (
+                <p className="text-[10px] text-amber-600 mt-1 leading-tight">bu veri tahmini veridir</p>
+            )}
         </div>
     );
 }
