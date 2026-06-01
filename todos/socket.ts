@@ -2,7 +2,7 @@ import { io, Socket } from 'socket.io-client';
 import { useTodoStore } from './store';
 
 /**
- * Todo realtime socket — backend `/todos` namespace, `tenant:{tenantId}` room.
+ * Todo realtime socket — backend `/tasks` namespace, `tenant:{tenantId}` room (TaskGateway).
  * Paylasilan modul (DathaModules): DathaManager + DathaDesktop ayni kodu kullanir.
  * Token, _shared/api ile ayni kaynaktan (localStorage `datha_auth`) okunur → app-agnostic.
  * Her olayda (created/updated/deleted/assigned) listeyi tazeler.
@@ -28,7 +28,7 @@ export function connectTodoSocket(): void {
     if (!token) return;
     disconnectTodoSocket();
 
-    socket = io(`${SOCKET_ROOT}/todos`, {
+    socket = io(`${SOCKET_ROOT}/tasks`, {
         transports: ['websocket'],
         auth: { token },
         reconnection: true,
