@@ -1,11 +1,12 @@
 import { io, Socket } from 'socket.io-client';
 import { useTodoStore } from './store';
+import { useReminderStore } from './reminderStore';
 
 /**
- * Todo realtime socket — backend `/tasks` namespace, `tenant:{tenantId}` room (TaskGateway).
+ * Todo + Hatirlatma realtime socket — backend `/tasks` namespace (TaskGateway).
  * Paylasilan modul (DathaModules): DathaManager + DathaDesktop ayni kodu kullanir.
  * Token, _shared/api ile ayni kaynaktan (localStorage `datha_auth`) okunur → app-agnostic.
- * Her olayda (created/updated/deleted/assigned) listeyi tazeler.
+ * Gorev olaylarinda gorev listesini, hatirlatma olaylarinda hatirlatma listesini tazeler.
  */
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 const SOCKET_ROOT = API_BASE_URL.replace(/\/api\/?$/, '');
@@ -41,6 +42,12 @@ export function connectTodoSocket(): void {
     socket.on('todo:updated', refetch);
     socket.on('todo:deleted', refetch);
     socket.on('todo:assigned', refetch);
+
+    const refetchReminders = () => {
+        void useReminderStore.getState().fetchReminders();
+    };
+    socket.on('reminder:new', refetchReminders);
+    socket.on('reminder:dismissed', refetchReminders);
 }
 
 export function disconnectTodoSocket(): void {

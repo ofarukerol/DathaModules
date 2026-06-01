@@ -5,6 +5,8 @@ import { todoService } from './service';
 import { Todo, Tag } from './types';
 import AddTodoModal from './components/AddTodoModal';
 import EditTodoModal from './components/EditTodoModal';
+import RemindersPanel from './components/RemindersPanel';
+import { useReminderStore } from './reminderStore';
 import PageToolbar from '@/components/PageToolbar';
 import { useAuthStore } from '@/stores/useAuthStore';
 import {
@@ -22,7 +24,9 @@ import {
     User,
     LayoutGrid,
     List,
-    GripVertical
+    GripVertical,
+    ListTodo,
+    Bell
 } from 'lucide-react';
 
 type ViewMode = 'kanban' | 'list';
@@ -59,6 +63,10 @@ const TodoBoard: React.FC<TodoBoardProps> = ({ currentUserName, getUsersFn }) =>
     const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [viewMode, setViewMode] = useState<ViewMode>('kanban');
+    // Ust seviye sekme: Gorevler (mevcut kurgu) | Hatirlatmalar (yeni)
+    const [boardTab, setBoardTab] = useState<'tasks' | 'reminders'>('tasks');
+    const reminderCount = useReminderStore((s) => s.reminders.length);
+    const fetchReminders = useReminderStore((s) => s.fetchReminders);
 
     // Custom drag state
     const [draggedTask, setDraggedTask] = useState<Todo | null>(null);
@@ -86,6 +94,7 @@ const TodoBoard: React.FC<TodoBoardProps> = ({ currentUserName, getUsersFn }) =>
 
     useEffect(() => {
         fetchTodos();
+        fetchReminders();
         // Realtime: DathaDesktop/DathaStaff degisikliklerini aninda yansit
         connectTodoSocket();
         return () => disconnectTodoSocket();
@@ -242,6 +251,34 @@ const TodoBoard: React.FC<TodoBoardProps> = ({ currentUserName, getUsersFn }) =>
 
     const toolbarActions = (
         <div className="flex items-center gap-2.5">
+            {/* Görevler | Hatırlatmalar üst sekmesi */}
+            <div className="flex items-center bg-white/10 border border-white/15 rounded-xl p-1">
+                <button
+                    onClick={() => setBoardTab('tasks')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        boardTab === 'tasks' ? 'bg-white text-[#663259]' : 'text-white/70 hover:text-white hover:bg-white/10'
+                    }`}
+                >
+                    <ListTodo size={13} />
+                    Görevler
+                </button>
+                <button
+                    onClick={() => setBoardTab('reminders')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        boardTab === 'reminders' ? 'bg-white text-[#663259]' : 'text-white/70 hover:text-white hover:bg-white/10'
+                    }`}
+                >
+                    <Bell size={13} />
+                    Hatırlatmalar
+                    {reminderCount > 0 && (
+                        <span className="ml-0.5 min-w-[16px] h-4 px-1 rounded-full bg-white text-[#663259] text-[9px] font-black flex items-center justify-center">
+                            {reminderCount}
+                        </span>
+                    )}
+                </button>
+            </div>
+
+            {boardTab === 'tasks' && (<>
             {/* Görünüm toggle */}
             <div className="flex items-center bg-white/10 border border-white/15 rounded-xl p-1">
                 <button
@@ -281,6 +318,7 @@ const TodoBoard: React.FC<TodoBoardProps> = ({ currentUserName, getUsersFn }) =>
                 <Plus size={16} />
                 Yeni Görev
             </button>
+            </>)}
         </div>
     );
 
@@ -294,6 +332,11 @@ const TodoBoard: React.FC<TodoBoardProps> = ({ currentUserName, getUsersFn }) =>
                     actions={toolbarActions}
                 />
 
+                {boardTab === 'reminders' && (
+                    <RemindersPanel getUsersFn={getUsersFn} />
+                )}
+
+                {boardTab === 'tasks' && (<>
                 {/* Stats satırı */}
                 <div className="flex items-center gap-3 flex-wrap shrink-0">
                     {[
@@ -653,6 +696,7 @@ const TodoBoard: React.FC<TodoBoardProps> = ({ currentUserName, getUsersFn }) =>
                 />
             )}
             </div>{/* /Body wrapper */}
+            </>)}
             </div>{/* /İç içerik */}
         </div>
     );
