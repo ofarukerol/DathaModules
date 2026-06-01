@@ -19,9 +19,11 @@ const WEBHOOK_URL = `${API_BASE_URL}/webhooks/whatsapp`;
 interface WhatsAppDetailProps {
     /** Ayarlar paneli içinde gömülü mü (kompakt başlık) */
     embedded?: boolean;
+    /** Panelin altına eklenecek ek bölüm (ör. ürün açıklamaları listesi) */
+    children?: React.ReactNode;
 }
 
-export default function WhatsAppDetail({ embedded = false }: WhatsAppDetailProps = {}) {
+export default function WhatsAppDetail({ embedded = false, children }: WhatsAppDetailProps = {}) {
     const navigate = useNavigate();
     const { integrations, fetchIntegrations, updateIntegration, deleteIntegration } = useIntegrationStore();
 
@@ -63,7 +65,7 @@ export default function WhatsAppDetail({ embedded = false }: WhatsAppDetailProps
     }
 
     return <WhatsAppDetailBody integration={integration} embedded={embedded}
-        onUpdate={updateIntegration} onDelete={deleteIntegration} navigate={navigate} />;
+        onUpdate={updateIntegration} onDelete={deleteIntegration} navigate={navigate}>{children}</WhatsAppDetailBody>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -74,9 +76,10 @@ interface BodyProps {
     onUpdate: (id: string, payload: UpdateIntegrationPayload) => Promise<IntegrationDto>;
     onDelete: (id: string) => Promise<void>;
     navigate: ReturnType<typeof useNavigate>;
+    children?: React.ReactNode;
 }
 
-function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigate }: BodyProps) {
+function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigate, children }: BodyProps) {
     const addToast = useToastStore((s) => s.addToast);
     const config = (integration.config ?? {}) as Record<string, unknown>;
 
@@ -276,6 +279,9 @@ function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigat
                     <CopyField label="Verify Token" value={BACKEND_VERIFY_TOKEN} />
                 </div>
             </Card>
+
+            {/* Ek bölüm — ürün açıklamaları listesi (Ayarlar > WhatsApp altında) */}
+            {children}
         </div>
     );
 }
