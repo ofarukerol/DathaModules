@@ -212,6 +212,12 @@ export default function MarketplaceSalesReport() {
         [filteredOrders],
     );
 
+    // Satılan ürünlerin toplam maliyeti (COGS) — filtrelenmiş siparişlerden
+    const listTotalCost = useMemo(
+        () => filteredOrders.reduce((acc, o) => acc + (o.cost ?? 0), 0),
+        [filteredOrders],
+    );
+
     const provider = useMemo(() => {
         const i = connected.find((x) => x.id === integrationId);
         return i?.provider ?? IntegrationProvider.TRENDYOL_FOOD;
@@ -473,6 +479,29 @@ export default function MarketplaceSalesReport() {
                                         <MetricCard icon="undo" label="İade" value={`-${formatCurrency(s.totalReturn)}`} color="#EF4444" />
                                         <MetricCard icon="account_balance_wallet" label="Hakediş" value={formatCurrency(s.totalSellerRevenue)} color="#663259" highlight />
                                     </div>
+
+                                    {/* Kârlılık — satılan ürünlerin maliyetine göre (yalnızca liste modunda) */}
+                                    {ordersShown && (
+                                        <>
+                                            <h3 className="text-sm font-bold text-gray-700 mt-4 mb-1 px-1">Kârlılık (Ürün Maliyetine Göre)</h3>
+                                            <p className="text-xs text-gray-400 mb-2 px-1">
+                                                Ürün Maliyeti = satılan ürünlerin Datha’daki maliyet fiyatı (costPrice) × adet.
+                                                Net Kâr = Hakediş − Ürün Maliyeti. Maliyeti girilmemiş veya eşleştirilmemiş ürünler
+                                                0 sayılır; bu yüzden ürün maliyetlerinizi ve eşleştirmeleri eksiksiz girin.
+                                            </p>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                <MetricCard icon="inventory_2" label="Ürün Maliyeti (COGS)" value={`-${formatCurrency(listTotalCost)}`} color="#EF4444" />
+                                                <MetricCard
+                                                    icon={s.totalSellerRevenue - listTotalCost >= 0 ? 'trending_up' : 'trending_down'}
+                                                    label="Net Kâr / Zarar"
+                                                    value={formatCurrency(s.totalSellerRevenue - listTotalCost)}
+                                                    color={s.totalSellerRevenue - listTotalCost >= 0 ? '#10B981' : '#EF4444'}
+                                                    gradientTo={s.totalSellerRevenue - listTotalCost >= 0 ? '#065F46' : '#991B1B'}
+                                                    highlight
+                                                />
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             )}
 
@@ -651,17 +680,19 @@ interface MetricCardProps {
     value: string;
     color: string;
     highlight?: boolean;
+    /** highlight gradyanının bitiş rengi (default koyu mor) */
+    gradientTo?: string;
     /** Tahmini veri → "bu veri tahmini veridir" uyarısı gösterir */
     estimated?: boolean;
 }
 
-function MetricCard({ icon, label, value, color, highlight, estimated }: MetricCardProps) {
+function MetricCard({ icon, label, value, color, highlight, gradientTo = '#4A235A', estimated }: MetricCardProps) {
     return (
         <div
             className={`relative rounded-2xl border p-4 shadow-sm ${
                 estimated ? 'bg-amber-50/60 border-amber-200' : highlight ? 'border-transparent text-white' : 'bg-white border-gray-100'
             }`}
-            style={highlight && !estimated ? { background: `linear-gradient(135deg, ${color} 0%, #4A235A 100%)` } : undefined}
+            style={highlight && !estimated ? { background: `linear-gradient(135deg, ${color} 0%, ${gradientTo} 100%)` } : undefined}
         >
             {estimated && (
                 <span

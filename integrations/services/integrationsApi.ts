@@ -277,6 +277,7 @@ export interface SalesReportOrderDto {
     status: string;
     orderDate: number;       // epoch ms (sipariş saati)
     dueDate: number | null;  // epoch ms (vade/ödeme tarihi)
+    cost: number;            // satılan ürünlerin maliyeti (COGS) — Datha costPrice × adet
 }
 
 export interface SalesReportDto {
