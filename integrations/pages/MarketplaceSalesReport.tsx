@@ -454,12 +454,12 @@ export default function MarketplaceSalesReport() {
                                                 tedarik edilemedi hariç). Trendyol panelindeki “Tamamlandı” ile birebir karşılaştırmak
                                                 için Statü = “Teslim Edildi” seçin. Komisyon, indirim, iade ve Hakediş yalnızca
                                                 muhasebeleşen (settlement) siparişleri yansıtır; bu yüzden teslim adedinden az olabilir.
-                                                Taşıma Bedeli, Trendyol API’sinde ayrı dönmediğinden toplam satışın %25’i ile TAHMİN edilir.
+                                                Taşıma Bedeli, Trendyol API’sinde ayrı dönmediğinden (Satış − İndirim)’in %25’i ile TAHMİN edilir.
                                             </>
                                         ) : (
                                             <>
                                                 Yalnızca özet getirildi (sipariş listesi çekilmedi). Bu rakamlar muhasebeleşen
-                                                (settlement) siparişleri yansıtır. Taşıma Bedeli toplam satışın %25’i ile tahmin edilir.
+                                                (settlement) siparişleri yansıtır. Taşıma Bedeli (Satış − İndirim)’in %25’i ile tahmin edilir.
                                                 Sipariş kayıtlarını görmek için “Siparişleri listele”yi işaretleyip Filtrele’ye basın.
                                             </>
                                         )}
@@ -468,7 +468,7 @@ export default function MarketplaceSalesReport() {
                                         <MetricCard icon="receipt_long" label="Toplam Sipariş" value={String(summaryOrderCount)} color="#663259" />
                                         <MetricCard icon="payments" label="Toplam Satış" value={formatCurrency(summarySales)} color="#10B981" />
                                         <MetricCard icon="percent" label="Platform Komisyonu" value={`-${formatCurrency(s.totalCommission)}`} color="#EF4444" />
-                                        <MetricCard icon="local_shipping" label="Taşıma Bedeli" value={`-${formatCurrency(summarySales * ESTIMATED_DELIVERY_RATE)}`} color="#F59E0B" estimated />
+                                        <MetricCard icon="local_shipping" label="Taşıma Bedeli" value={`-${formatCurrency(Math.max(0, summarySales - s.totalDiscount) * ESTIMATED_DELIVERY_RATE)}`} color="#F59E0B" estimated />
                                         <MetricCard icon="sell" label="İndirim" value={`-${formatCurrency(s.totalDiscount)}`} color="#F59E0B" />
                                         <MetricCard icon="undo" label="İade" value={`-${formatCurrency(s.totalReturn)}`} color="#EF4444" />
                                         <MetricCard icon="account_balance_wallet" label="Hakediş" value={formatCurrency(s.totalSellerRevenue)} color="#663259" highlight />
@@ -666,7 +666,7 @@ function MetricCard({ icon, label, value, color, highlight, estimated }: MetricC
             {estimated && (
                 <span
                     className="absolute top-2 right-2 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 text-[9px] font-bold uppercase tracking-wide"
-                    title="Bu veri tahmini veridir (sipariş tutarının %25'i)"
+                    title="Bu veri tahmini veridir ((Satış − İndirim)'in %25'i)"
                 >
                     <span className="material-symbols-outlined text-[11px]">info</span>
                     Tahmini
