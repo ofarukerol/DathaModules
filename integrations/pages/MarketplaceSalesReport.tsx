@@ -23,9 +23,6 @@ const daysBetween = (startStr: string, endStr: string) =>
 // Bu süreden uzun aralıkta sipariş listesi (paketler) varsayılan olarak çekilmez — yavaş.
 const AUTO_LIST_MAX_DAYS = 7;
 
-// Taşıma bedeli Trendyol API'sinde ayrı dönmez → toplam satışın %25'i ile TAHMİN edilir.
-const ESTIMATED_DELIVERY_RATE = 0.25;
-
 type Preset = 'today' | 'week' | 'month' | 'lastMonth' | 'custom';
 
 function presetRange(preset: Exclude<Preset, 'custom'>): { start: string; end: string } {
@@ -227,10 +224,11 @@ export default function MarketplaceSalesReport() {
     // ordersIncluded yoksa (eski backend) liste her zaman gelirdi → true varsay.
     const ordersShown = report ? (report.ordersIncluded ?? true) : false;
 
-    // Özet "Toplam Sipariş/Satış": liste getirildiyse listeden (tutarlılık),
-    // yalnızca özet modunda settlement'tan (muhasebeleşen).
-    const summaryOrderCount = ordersShown ? filteredOrders.length : (s?.totalOrders ?? 0);
-    const summarySales = ordersShown ? listTotalSales : (s?.totalSales ?? 0);
+    // Özet kartları (Sipariş/Satış/Komisyon/İndirim/Hakediş) DAİMA settlement
+    // (muhasebeleşen) bazında — böylece tüm finansal kartlar aynı dönemi gösterir
+    // ve kendi içinde tutarlı olur. Liste değerleri yalnızca fallback (settlement yoksa).
+    const summaryOrderCount = s?.totalOrders ?? filteredOrders.length;
+    const summarySales = s?.totalSales ?? listTotalSales;
 
     // ─── CSV indir (Gün Sonu Raporu) ───
     const downloadCsv = () => {
@@ -449,59 +447,69 @@ export default function MarketplaceSalesReport() {
                                 </div>
                             )}
 
-                            {/* Özet kartları */}
+                            {/* Özet kartları — sol: metrikler, sağ: dar Hakediş/Net Kâr kolonu */}
                             {s && (
-                                <div>
-                                    <h3 className="text-sm font-bold text-gray-700 mb-1 px-1">Sipariş Kayıtları Özet</h3>
-                                    <p className="text-xs text-gray-400 mb-2 px-1">
-                                        {ordersShown ? (
+                                <div className="grid grid-cols-1 xl:grid-cols-4 gap-3 items-start">
+                                    {/* Sol blok (3/4): özet metrikleri + ürün maliyeti */}
+                                    <div className="xl:col-span-3">
+                                        <h3 className="text-sm font-bold text-gray-700 mb-1 px-1">Sipariş Kayıtları Özet</h3>
+                                        <p className="text-xs text-gray-400 mb-2 px-1">
+                                            {ordersShown ? (
+                                                <>
+                                                    Tüm özet kartları muhasebeleşen (settlement) dönemini yansıtır — Toplam Satış,
+                                                    Komisyon, İndirim, İade ve Hakediş aynı tarih bazındadır. Trendyol ödemeyi siparişten
+                                                    gün/hafta sonra muhasebeleştirdiği için bu kartlar, aşağıdaki sipariş listesinden
+                                                    (sipariş tarihi bazlı) farklı bir sipariş kümesini kapsayabilir. Taşıma Bedeli,
+                                                    settlement’taki gerçek kesintiden gelir (kendi kuryenizde 0 olur).
+                                                </>
+                                            ) : (
+                                                <>
+                                                    Yalnızca özet getirildi (sipariş listesi çekilmedi). Rakamlar muhasebeleşen
+                                                    (settlement) dönemini yansıtır. Taşıma Bedeli, settlement’taki gerçek kesintiden gelir
+                                                    (kendi kuryenizde 0 olur). Sipariş kayıtlarını görmek için “Siparişleri listele”yi
+                                                    işaretleyip Filtrele’ye basın.
+                                                </>
+                                            )}
+                                        </p>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                            <MetricCard icon="receipt_long" label="Toplam Sipariş" value={String(summaryOrderCount)} color="#663259" />
+                                            <MetricCard icon="payments" label="Toplam Satış" value={formatCurrency(summarySales)} color="#10B981" />
+                                            <MetricCard icon="percent" label="Platform Komisyonu" value={`-${formatCurrency(s.totalCommission)}`} color="#EF4444" />
+                                            <MetricCard icon="local_shipping" label="Taşıma Bedeli" value={`-${formatCurrency(s.totalDelivery)}`} color="#F59E0B" />
+                                            <MetricCard icon="sell" label="İndirim" value={`-${formatCurrency(s.totalDiscount)}`} color="#F59E0B" />
+                                            <MetricCard icon="undo" label="İade" value={`-${formatCurrency(s.totalReturn)}`} color="#EF4444" />
+                                        </div>
+
+                                        {/* Ürün Maliyeti — yalnızca liste modunda (COGS listeden hesaplanır) */}
+                                        {ordersShown && (
                                             <>
-                                                Toplam Sipariş ve Satış seçili statüdeki siparişleri kapsar (varsayılan: iptal /
-                                                tedarik edilemedi hariç). Trendyol panelindeki “Tamamlandı” ile birebir karşılaştırmak
-                                                için Statü = “Teslim Edildi” seçin. Komisyon, indirim, iade ve Hakediş yalnızca
-                                                muhasebeleşen (settlement) siparişleri yansıtır; bu yüzden teslim adedinden az olabilir.
-                                                Taşıma Bedeli, Trendyol API’sinde ayrı dönmediğinden (Satış − İndirim)’in %25’i ile TAHMİN edilir.
-                                            </>
-                                        ) : (
-                                            <>
-                                                Yalnızca özet getirildi (sipariş listesi çekilmedi). Bu rakamlar muhasebeleşen
-                                                (settlement) siparişleri yansıtır. Taşıma Bedeli (Satış − İndirim)’in %25’i ile tahmin edilir.
-                                                Sipariş kayıtlarını görmek için “Siparişleri listele”yi işaretleyip Filtrele’ye basın.
+                                                <h3 className="text-sm font-bold text-gray-700 mt-4 mb-1 px-1">Kârlılık (Ürün Maliyetine Göre)</h3>
+                                                <p className="text-xs text-gray-400 mb-2 px-1">
+                                                    Ürün Maliyeti = satılan ürünlerin Datha’daki maliyet fiyatı (costPrice) × adet.
+                                                    Net Kâr = Hakediş − Ürün Maliyeti. Maliyeti girilmemiş veya eşleştirilmemiş ürünler
+                                                    0 sayılır; bu yüzden ürün maliyetlerinizi ve eşleştirmeleri eksiksiz girin.
+                                                </p>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                                    <MetricCard icon="inventory_2" label="Ürün Maliyeti (COGS)" value={`-${formatCurrency(listTotalCost)}`} color="#EF4444" />
+                                                </div>
                                             </>
                                         )}
-                                    </p>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
-                                        <MetricCard icon="receipt_long" label="Toplam Sipariş" value={String(summaryOrderCount)} color="#663259" />
-                                        <MetricCard icon="payments" label="Toplam Satış" value={formatCurrency(summarySales)} color="#10B981" />
-                                        <MetricCard icon="percent" label="Platform Komisyonu" value={`-${formatCurrency(s.totalCommission)}`} color="#EF4444" />
-                                        <MetricCard icon="local_shipping" label="Taşıma Bedeli" value={`-${formatCurrency(Math.max(0, summarySales - s.totalDiscount) * ESTIMATED_DELIVERY_RATE)}`} color="#F59E0B" estimated />
-                                        <MetricCard icon="sell" label="İndirim" value={`-${formatCurrency(s.totalDiscount)}`} color="#F59E0B" />
-                                        <MetricCard icon="undo" label="İade" value={`-${formatCurrency(s.totalReturn)}`} color="#EF4444" />
-                                        <MetricCard icon="account_balance_wallet" label="Hakediş" value={formatCurrency(s.totalSellerRevenue)} color="#663259" highlight />
                                     </div>
 
-                                    {/* Kârlılık — satılan ürünlerin maliyetine göre (yalnızca liste modunda) */}
-                                    {ordersShown && (
-                                        <>
-                                            <h3 className="text-sm font-bold text-gray-700 mt-4 mb-1 px-1">Kârlılık (Ürün Maliyetine Göre)</h3>
-                                            <p className="text-xs text-gray-400 mb-2 px-1">
-                                                Ürün Maliyeti = satılan ürünlerin Datha’daki maliyet fiyatı (costPrice) × adet.
-                                                Net Kâr = Hakediş − Ürün Maliyeti. Maliyeti girilmemiş veya eşleştirilmemiş ürünler
-                                                0 sayılır; bu yüzden ürün maliyetlerinizi ve eşleştirmeleri eksiksiz girin.
-                                            </p>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                <MetricCard icon="inventory_2" label="Ürün Maliyeti (COGS)" value={`-${formatCurrency(listTotalCost)}`} color="#EF4444" />
-                                                <MetricCard
-                                                    icon={s.totalSellerRevenue - listTotalCost >= 0 ? 'trending_up' : 'trending_down'}
-                                                    label="Net Kâr / Zarar"
-                                                    value={formatCurrency(s.totalSellerRevenue - listTotalCost)}
-                                                    color={s.totalSellerRevenue - listTotalCost >= 0 ? '#10B981' : '#EF4444'}
-                                                    gradientTo={s.totalSellerRevenue - listTotalCost >= 0 ? '#065F46' : '#991B1B'}
-                                                    highlight
-                                                />
-                                            </div>
-                                        </>
-                                    )}
+                                    {/* Sağ dar kolon: Hakediş + Net Kâr/Zarar alt alta */}
+                                    <div className="flex flex-col gap-3">
+                                        <MetricCard icon="account_balance_wallet" label="Hakediş" value={formatCurrency(s.totalSellerRevenue)} color="#663259" highlight />
+                                        {ordersShown && (
+                                            <MetricCard
+                                                icon={s.totalSellerRevenue - listTotalCost >= 0 ? 'trending_up' : 'trending_down'}
+                                                label="Net Kâr / Zarar"
+                                                value={formatCurrency(s.totalSellerRevenue - listTotalCost)}
+                                                color={s.totalSellerRevenue - listTotalCost >= 0 ? '#10B981' : '#EF4444'}
+                                                gradientTo={s.totalSellerRevenue - listTotalCost >= 0 ? '#065F46' : '#991B1B'}
+                                                highlight
+                                            />
+                                        )}
+                                    </div>
                                 </div>
                             )}
 
