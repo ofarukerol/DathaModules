@@ -23,6 +23,14 @@ const daysBetween = (startStr: string, endStr: string) =>
 // Bu süreden uzun aralıkta sipariş listesi (paketler) varsayılan olarak çekilmez — yavaş.
 const AUTO_LIST_MAX_DAYS = 7;
 
+// Taşıma bedeli — iki bazda gösterilir:
+//  1) Hızır (kendi kurye servisi): paket başına 100₺ + %20 KDV = 120₺
+//  2) Trendyol taşısaydı (tahmini): (Satış − İndirim) × %25
+const HIZIR_DELIVERY_BASE = 100;
+const KDV_RATE = 0.2;
+const HIZIR_DELIVERY_FEE_PER_PACKAGE = HIZIR_DELIVERY_BASE * (1 + KDV_RATE); // 120₺
+const TRENDYOL_DELIVERY_RATE = 0.25;
+
 type Preset = 'today' | 'week' | 'month' | 'lastMonth' | 'custom';
 
 function presetRange(preset: Exclude<Preset, 'custom'>): { start: string; end: string } {
@@ -229,6 +237,13 @@ export default function MarketplaceSalesReport() {
     // ve kendi içinde tutarlı olur. Liste değerleri yalnızca fallback (settlement yoksa).
     const summaryOrderCount = s?.totalOrders ?? filteredOrders.length;
     const summarySales = s?.totalSales ?? listTotalSales;
+
+    // Taşıma bedeli: Hızır (gerçek, paket başına 120₺) vs Trendyol (tahmini, net satışın %25'i)
+    const hizirDelivery = summaryOrderCount * HIZIR_DELIVERY_FEE_PER_PACKAGE;
+    const trendyolDelivery = Math.max(0, summarySales - (s?.totalDiscount ?? 0)) * TRENDYOL_DELIVERY_RATE;
+
+    // Net Kâr = Hakediş − Ürün Maliyeti (COGS) − Hızır Taşıma (gerçek kurye maliyeti)
+    const netProfit = (s?.totalSellerRevenue ?? 0) - listTotalCost - hizirDelivery;
 
     // ─── CSV indir (Gün Sonu Raporu) ───
     const downloadCsv = () => {
@@ -450,34 +465,48 @@ export default function MarketplaceSalesReport() {
                             {/* Özet kartları — sol: metrikler, sağ: dar Hakediş/Net Kâr kolonu */}
                             {s && (
                                 <div className="grid grid-cols-1 xl:grid-cols-4 gap-3 items-start">
-                                    {/* Sol blok (3/4): özet metrikleri + ürün maliyeti */}
-                                    <div className="xl:col-span-3">
+                                    {/* Başlık + açıklama — tüm genişlik (kolon hizası bozulmasın) */}
+                                    <div className="xl:col-span-4">
                                         <h3 className="text-sm font-bold text-gray-700 mb-1 px-1">Sipariş Kayıtları Özet</h3>
-                                        <p className="text-xs text-gray-400 mb-2 px-1">
+                                        <p className="text-xs text-gray-400 px-1">
                                             {ordersShown ? (
                                                 <>
                                                     Tüm özet kartları muhasebeleşen (settlement) dönemini yansıtır — Toplam Satış,
                                                     Komisyon, İndirim, İade ve Hakediş aynı tarih bazındadır. Trendyol ödemeyi siparişten
                                                     gün/hafta sonra muhasebeleştirdiği için bu kartlar, aşağıdaki sipariş listesinden
-                                                    (sipariş tarihi bazlı) farklı bir sipariş kümesini kapsayabilir. Taşıma Bedeli,
-                                                    settlement’taki gerçek kesintiden gelir (kendi kuryenizde 0 olur).
+                                                    (sipariş tarihi bazlı) farklı bir sipariş kümesini kapsayabilir. Taşıma Bedeli iki bazda
+                                                    gösterilir: <strong>Hızır</strong> (kendi kuryeniz) paket başına {formatCurrency(HIZIR_DELIVERY_FEE_PER_PACKAGE)},
+                                                    ve <strong>Trendyol</strong> taşısaydı (Satış − İndirim)’in %25’i (tahmini).
                                                 </>
                                             ) : (
                                                 <>
                                                     Yalnızca özet getirildi (sipariş listesi çekilmedi). Rakamlar muhasebeleşen
-                                                    (settlement) dönemini yansıtır. Taşıma Bedeli, settlement’taki gerçek kesintiden gelir
-                                                    (kendi kuryenizde 0 olur). Sipariş kayıtlarını görmek için “Siparişleri listele”yi
+                                                    (settlement) dönemini yansıtır. Taşıma Bedeli iki bazda gösterilir: Hızır (kendi kuryeniz)
+                                                    paket başına {formatCurrency(HIZIR_DELIVERY_FEE_PER_PACKAGE)}, ve Trendyol taşısaydı
+                                                    (Satış − İndirim)’in %25’i (tahmini). Sipariş kayıtlarını görmek için “Siparişleri listele”yi
                                                     işaretleyip Filtrele’ye basın.
                                                 </>
                                             )}
                                         </p>
+                                    </div>
+                                    {/* Sol blok (3/4): özet metrikleri + ürün maliyeti */}
+                                    <div className="xl:col-span-3">
                                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                                             <MetricCard icon="receipt_long" label="Toplam Sipariş" value={String(summaryOrderCount)} color="#663259" />
                                             <MetricCard icon="payments" label="Toplam Satış" value={formatCurrency(summarySales)} color="#10B981" />
                                             <MetricCard icon="percent" label="Platform Komisyonu" value={`-${formatCurrency(s.totalCommission)}`} color="#EF4444" />
-                                            <MetricCard icon="local_shipping" label="Taşıma Bedeli" value={`-${formatCurrency(s.totalDelivery)}`} color="#F59E0B" />
                                             <MetricCard icon="sell" label="İndirim" value={`-${formatCurrency(s.totalDiscount)}`} color="#F59E0B" />
                                             <MetricCard icon="undo" label="İade" value={`-${formatCurrency(s.totalReturn)}`} color="#EF4444" />
+                                        </div>
+
+                                        {/* Taşıma Bedeli — Hızır (gerçek) vs Trendyol (tahmini) */}
+                                        <div className="mt-3">
+                                            <DeliveryCard
+                                                orderCount={summaryOrderCount}
+                                                perPackage={HIZIR_DELIVERY_FEE_PER_PACKAGE}
+                                                hizirCost={hizirDelivery}
+                                                trendyolCost={trendyolDelivery}
+                                            />
                                         </div>
 
                                         {/* Ürün Maliyeti — yalnızca liste modunda (COGS listeden hesaplanır) */}
@@ -486,8 +515,9 @@ export default function MarketplaceSalesReport() {
                                                 <h3 className="text-sm font-bold text-gray-700 mt-4 mb-1 px-1">Kârlılık (Ürün Maliyetine Göre)</h3>
                                                 <p className="text-xs text-gray-400 mb-2 px-1">
                                                     Ürün Maliyeti = satılan ürünlerin Datha’daki maliyet fiyatı (costPrice) × adet.
-                                                    Net Kâr = Hakediş − Ürün Maliyeti. Maliyeti girilmemiş veya eşleştirilmemiş ürünler
-                                                    0 sayılır; bu yüzden ürün maliyetlerinizi ve eşleştirmeleri eksiksiz girin.
+                                                    Net Kâr = Hakediş − Ürün Maliyeti − Hızır Taşıma (gerçek kurye maliyeti). Maliyeti
+                                                    girilmemiş veya eşleştirilmemiş ürünler 0 sayılır; bu yüzden ürün maliyetlerinizi ve
+                                                    eşleştirmeleri eksiksiz girin.
                                                 </p>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                                     <MetricCard icon="inventory_2" label="Ürün Maliyeti (COGS)" value={`-${formatCurrency(listTotalCost)}`} color="#EF4444" />
@@ -501,11 +531,12 @@ export default function MarketplaceSalesReport() {
                                         <MetricCard icon="account_balance_wallet" label="Hakediş" value={formatCurrency(s.totalSellerRevenue)} color="#663259" highlight />
                                         {ordersShown && (
                                             <MetricCard
-                                                icon={s.totalSellerRevenue - listTotalCost >= 0 ? 'trending_up' : 'trending_down'}
+                                                icon={netProfit >= 0 ? 'trending_up' : 'trending_down'}
                                                 label="Net Kâr / Zarar"
-                                                value={formatCurrency(s.totalSellerRevenue - listTotalCost)}
-                                                color={s.totalSellerRevenue - listTotalCost >= 0 ? '#10B981' : '#EF4444'}
-                                                gradientTo={s.totalSellerRevenue - listTotalCost >= 0 ? '#065F46' : '#991B1B'}
+                                                value={formatCurrency(netProfit)}
+                                                color={netProfit >= 0 ? '#10B981' : '#EF4444'}
+                                                gradientTo={netProfit >= 0 ? '#065F46' : '#991B1B'}
+                                                sub="Hakediş − Maliyet − Hızır taşıma"
                                                 highlight
                                             />
                                         )}
@@ -681,7 +712,7 @@ function PagerBtn({ icon, disabled, onClick }: { icon: string; disabled: boolean
     );
 }
 
-// ─── Özet kartı ───
+// ─── Özet kartı (modern) ───
 interface MetricCardProps {
     icon: string;
     label: string;
@@ -690,40 +721,82 @@ interface MetricCardProps {
     highlight?: boolean;
     /** highlight gradyanının bitiş rengi (default koyu mor) */
     gradientTo?: string;
-    /** Tahmini veri → "bu veri tahmini veridir" uyarısı gösterir */
-    estimated?: boolean;
+    /** kart altında ufak açıklama satırı (opsiyonel) */
+    sub?: string;
 }
 
-function MetricCard({ icon, label, value, color, highlight, gradientTo = '#4A235A', estimated }: MetricCardProps) {
-    return (
-        <div
-            className={`relative rounded-2xl border p-4 shadow-sm ${
-                estimated ? 'bg-amber-50/60 border-amber-200' : highlight ? 'border-transparent text-white' : 'bg-white border-gray-100'
-            }`}
-            style={highlight && !estimated ? { background: `linear-gradient(135deg, ${color} 0%, ${gradientTo} 100%)` } : undefined}
-        >
-            {estimated && (
-                <span
-                    className="absolute top-2 right-2 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 text-[9px] font-bold uppercase tracking-wide"
-                    title="Bu veri tahmini veridir ((Satış − İndirim)'in %25'i)"
-                >
-                    <span className="material-symbols-outlined text-[11px]">info</span>
-                    Tahmini
-                </span>
-            )}
+function MetricCard({ icon, label, value, color, highlight, gradientTo = '#4A235A', sub }: MetricCardProps) {
+    if (highlight) {
+        return (
             <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center mb-2"
-                style={{ backgroundColor: highlight && !estimated ? 'rgba(255,255,255,0.18)' : `${color}1A` }}
+                className="relative overflow-hidden rounded-2xl p-4 text-white transition-transform duration-200 hover:-translate-y-0.5"
+                style={{ background: `linear-gradient(135deg, ${color} 0%, ${gradientTo} 100%)`, boxShadow: `0 12px 28px -10px ${color}99` }}
             >
-                <span className="material-symbols-outlined text-[20px]" style={{ color: highlight && !estimated ? '#fff' : color }}>
-                    {icon}
-                </span>
+                <div className="pointer-events-none absolute -top-10 -right-10 h-28 w-28 rounded-full bg-white/10" />
+                <div className="relative">
+                    <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">
+                        <span className="material-symbols-outlined text-[22px] text-white">{icon}</span>
+                    </div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-white/70">{label}</p>
+                    <p className="mt-1 text-2xl font-extrabold tabular-nums">{value}</p>
+                    {sub && <p className="mt-1 text-[11px] text-white/60">{sub}</p>}
+                </div>
             </div>
-            <p className={`text-xs font-medium ${highlight && !estimated ? 'text-white/70' : 'text-gray-500'}`}>{label}</p>
-            <p className={`text-lg font-bold mt-0.5 ${highlight && !estimated ? 'text-white' : 'text-gray-800'}`}>{value}</p>
-            {estimated && (
-                <p className="text-[10px] text-amber-600 mt-1 leading-tight">bu veri tahmini veridir</p>
-            )}
+        );
+    }
+    return (
+        <div className="group relative rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-gray-200 hover:shadow-md">
+            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: `${color}14` }}>
+                <span className="material-symbols-outlined text-[22px]" style={{ color }}>{icon}</span>
+            </div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">{label}</p>
+            <p className="mt-1 text-xl font-bold tabular-nums text-gray-800">{value}</p>
+            {sub && <p className="mt-1 text-[11px] text-gray-400">{sub}</p>}
+        </div>
+    );
+}
+
+// ─── Taşıma Bedeli kartı: Hızır (gerçek) vs Trendyol (tahmini) ───
+interface DeliveryCardProps {
+    orderCount: number;
+    perPackage: number;
+    hizirCost: number;
+    trendyolCost: number;
+}
+
+function DeliveryCard({ orderCount, perPackage, hizirCost, trendyolCost }: DeliveryCardProps) {
+    return (
+        <div className="group relative rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-all duration-200 hover:border-gray-200 hover:shadow-md">
+            <div className="mb-3 flex items-center gap-2.5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: '#F59E0B14' }}>
+                    <span className="material-symbols-outlined text-[22px]" style={{ color: '#F59E0B' }}>local_shipping</span>
+                </div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Taşıma Bedeli</p>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {/* Hızır — gerçek maliyet */}
+                <div className="flex items-center justify-between gap-2 rounded-xl bg-amber-50 px-3 py-2.5">
+                    <div className="min-w-0">
+                        <p className="flex items-center gap-1 text-xs font-bold text-amber-900">
+                            <span className="material-symbols-outlined text-[14px]">verified</span>
+                            Hızır <span className="font-medium text-amber-600">· gerçek</span>
+                        </p>
+                        <p className="mt-0.5 text-[10px] text-amber-600">{orderCount} paket × {formatCurrency(perPackage)}</p>
+                    </div>
+                    <p className="shrink-0 text-base font-extrabold tabular-nums text-amber-700">-{formatCurrency(hizirCost)}</p>
+                </div>
+                {/* Trendyol — tahmini */}
+                <div className="flex items-center justify-between gap-2 rounded-xl bg-gray-50 px-3 py-2.5">
+                    <div className="min-w-0">
+                        <p className="flex items-center gap-1 text-xs font-bold text-gray-600">
+                            <span className="material-symbols-outlined text-[14px]">insights</span>
+                            Trendyol <span className="font-medium text-gray-400">· tahmini</span>
+                        </p>
+                        <p className="mt-0.5 text-[10px] text-gray-400">(Satış − İndirim) × %25</p>
+                    </div>
+                    <p className="shrink-0 text-base font-extrabold tabular-nums text-gray-500">-{formatCurrency(trendyolCost)}</p>
+                </div>
+            </div>
         </div>
     );
 }
