@@ -22,6 +22,8 @@ export { useEFaturaCapture } from './hooks/useEFaturaCapture';
 export { efaturaService } from './services/efaturaService';
 
 // ─── Stores ───
+export { useCompanyStore } from './stores/useCompanyStore';
+export { companyService } from './services/companyService';
 export { useBankStore } from './stores/useBankStore';
 export { useBankAccountStore } from './stores/useBankAccountStore';
 export { useBankTransactionStore } from './stores/useBankTransactionStore';

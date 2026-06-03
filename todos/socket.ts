@@ -1,6 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 import { useTodoStore } from './store';
 import { useReminderStore } from './reminderStore';
+import { useCompanyStore } from '../finance/stores/useCompanyStore';
 
 /**
  * Todo + Hatirlatma realtime socket — backend `/tasks` namespace (TaskGateway).
@@ -48,6 +49,11 @@ export function connectTodoSocket(): void {
     };
     socket.on('reminder:new', refetchReminders);
     socket.on('reminder:dismissed', refetchReminders);
+
+    // Finans degisikligi (cari/fatura/...) — diger cihazda yapilan degisikligi tazele
+    socket.on('finance:changed', () => {
+        void useCompanyStore.getState().fetchCompanies();
+    });
 }
 
 export function disconnectTodoSocket(): void {

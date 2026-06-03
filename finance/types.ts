@@ -57,6 +57,7 @@ export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
 
 export interface Company {
     id: string;
+    localId?: string;
     name: string;
     title?: string;
     type: CompanyType;
