@@ -11,14 +11,41 @@ import { formatCurrency } from '../../../utils/datha/helpers';
 import { useIntegrationStore } from '../stores/useIntegrationStore';
 import { integrationsApi, type SalesReportDto, type SalesReportOrderDto } from '../services/integrationsApi';
 import { IntegrationProvider, PROVIDER_LABELS } from '../../../shared/src';
+import { useSettingsStore } from '../../../stores/useSettingsStore';
 
 // ─── Tarih yardımcıları (yerel saat) ───
 const pad = (n: number) => String(n).padStart(2, '0');
 const toDateStr = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const startOfDayMs = (dateStr: string) => new Date(`${dateStr}T00:00:00`).getTime();
-const endOfDayMs = (dateStr: string) => new Date(`${dateStr}T23:59:59.999`).getTime();
 const daysBetween = (startStr: string, endStr: string) =>
     Math.floor((startOfDayMs(endStr) - startOfDayMs(startStr)) / 86_400_000) + 1;
+
+// "HH:MM" → [saat, dakika]
+const parseHM = (t: string): [number, number] => {
+    const [h, m] = (t || '').split(':');
+    const hh = parseInt(h, 10);
+    const mm = parseInt(m, 10);
+    return [Number.isFinite(hh) ? hh : 0, Number.isFinite(mm) ? mm : 0];
+};
+
+// İşletme açılış saatine göre aralık BAŞLANGICI (epoch ms).
+const startWithOpen = (dateStr: string, openTime: string) => {
+    const [h, m] = parseHM(openTime);
+    const d = new Date(`${dateStr}T00:00:00`);
+    d.setHours(h, m, 0, 0);
+    return d.getTime();
+};
+
+// İşletme kapanış saatine göre aralık SONU (epoch ms). Kapanış açılışa eşit/küçükse
+// (gece yarısını geçen vardiya, örn. 09:00 açılış – 03:00 kapanış) bir sonraki güne taşar.
+const endWithClose = (dateStr: string, openTime: string, closeTime: string) => {
+    const [oh, om] = parseHM(openTime);
+    const [ch, cm] = parseHM(closeTime);
+    const d = new Date(`${dateStr}T00:00:00`);
+    if (ch * 60 + cm <= oh * 60 + om) d.setDate(d.getDate() + 1);
+    d.setHours(ch, cm, 59, 999);
+    return d.getTime();
+};
 
 // Bu süreden uzun aralıkta sipariş listesi (paketler) varsayılan olarak çekilmez — yavaş.
 const AUTO_LIST_MAX_DAYS = 7;
@@ -104,6 +131,11 @@ export default function MarketplaceSalesReport() {
     );
     const [integrationId, setIntegrationId] = useState<string>('');
 
+    // İşletme açılış/kapanış saatleri — günlük aralık bunlara göre alınır
+    // (örn. 09:00 açılış – 03:00 kapanış → "Bugün" = bugün 09:00 → yarın 03:00).
+    const storeOpenTime = useSettingsStore((st) => st.storeOpenTime);
+    const storeCloseTime = useSettingsStore((st) => st.storeCloseTime);
+
     // Filtre state
     const initial = presetRange('today');
     const [preset, setPreset] = useState<Preset>('today');
@@ -145,7 +177,12 @@ export default function MarketplaceSalesReport() {
         setLoading(true);
         setError(null);
         try {
-            const data = await integrationsApi.getSalesReport(id, startOfDayMs(sd), endOfDayMs(ed), inc);
+            const data = await integrationsApi.getSalesReport(
+                id,
+                startWithOpen(sd, storeOpenTime),
+                endWithClose(ed, storeOpenTime, storeCloseTime),
+                inc,
+            );
             setReport(data);
             if (data.error) setError(data.error);
         } catch (err) {
