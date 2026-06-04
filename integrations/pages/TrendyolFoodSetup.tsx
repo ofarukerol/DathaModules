@@ -41,12 +41,38 @@ export default function TrendyolFoodSetup() {
     const [testResult, setTestResult] = useState<TestConnectionResult | null>(null);
 
     const providerColors = PROVIDER_COLORS[providerParam];
+    const isYemeksepeti = providerParam === IntegrationProvider.YEMEKSEPETI;
+
+    // Provider-bazlı alan etiketleri. Yemeksepeti (Partner API) farklı kimlik kullanır:
+    //   client_id/secret + chain_id + vendor_id (Trendyol: Satıcı ID + API Key/Secret + executorUser)
+    const labels = isYemeksepeti
+        ? {
+              account: 'Chain ID (Zincir)',
+              accountPh: 'örn: chain-abc123',
+              store: 'Vendor ID (Entegratör Restoran ID)',
+              storePh: 'Yemeksepeti satıcı sayfanızdaki mağaza/restoran ID',
+              apiKey: 'Client ID',
+              apiKeyPh: 'OAuth client_id',
+              apiSecret: 'Client Secret',
+              apiSecretPh: 'OAuth client_secret',
+          }
+        : {
+              account: 'Satıcı ID',
+              accountPh: 'örn: 6651369',
+              store: 'Mağaza ID (opsiyonel)',
+              storePh: 'Ürün/menü eşleştirme için (storeId)',
+              apiKey: 'API Key',
+              apiKeyPh: 'X8H2IXVvc0TXMFwN0ejq',
+              apiSecret: 'API Secret',
+              apiSecretPh: '0Boi44McR7LVXLEFPJiV',
+          };
 
     const isFormValid =
         externalAccountId.trim().length > 0 &&
         apiKey.trim().length > 0 &&
         apiSecret.trim().length > 0 &&
-        executorUser.trim().length > 0;
+        // Yemeksepeti: vendor_id (externalStoreId) zorunlu. Trendyol: executorUser zorunlu.
+        (isYemeksepeti ? externalStoreId.trim().length > 0 : executorUser.trim().length > 0);
 
     const handleSubmit = async () => {
         if (!isFormValid) return;
@@ -57,10 +83,11 @@ export default function TrendyolFoodSetup() {
                 provider: providerParam,
                 externalAccountId: externalAccountId.trim(),
                 externalStoreId: externalStoreId.trim() || undefined,
-                executorUser: executorUser.trim(),
+                // executorUser yalnız Trendyol GO (x-executor-user header) için; Yemeksepeti kullanmaz.
+                executorUser: isYemeksepeti ? undefined : executorUser.trim(),
                 apiKey: apiKey.trim(),
                 apiSecret: apiSecret.trim(),
-                token: token.trim() || undefined,
+                token: isYemeksepeti ? undefined : token.trim() || undefined,
                 features: { fetchOrders: true, pushStatus: false, syncStock: false, syncPrice: false },
             });
             setCreatedIntegration(created);
@@ -129,27 +156,57 @@ export default function TrendyolFoodSetup() {
                         {step === 1 && (
                             <div className="flex flex-col gap-4">
                                 <h2 className="text-xl font-bold text-gray-800">Başlamadan önce</h2>
-                                <p className="text-sm text-gray-600 leading-relaxed">
-                                    Trendyol satıcı panelinizden API erişim bilgilerinizi alın. Bu işlem için
-                                    Trendyol Developer Portal'a giriş yapmanız gerekir.
-                                </p>
-                                <a
-                                    href="https://developers.trendyol.com/v2.0/docs/getting-started"
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="text-sm text-[#F27A1A] font-semibold underline"
-                                >
-                                    Trendyol Developer Portal →
-                                </a>
-                                <p className="text-sm text-gray-600 mt-2">
-                                    Aşağıdaki bilgileri elinizin altında bulundurun:
-                                </p>
-                                <ul className="text-sm text-gray-700 list-disc pl-5 space-y-1">
-                                    <li>Satıcı ID (Supplier ID)</li>
-                                    <li>API Key</li>
-                                    <li>API Secret</li>
-                                    <li>(Opsiyonel) Hazır Basic Auth Token</li>
-                                </ul>
+                                {isYemeksepeti ? (
+                                    <>
+                                        <p className="text-sm text-gray-600 leading-relaxed">
+                                            Yemeksepeti (Delivery Hero) <b>Partner API</b> bilgilerinizi alın. Bunları
+                                            Vendor/Partner Portal → <b>All Settings → Shop Integrations</b> bölümünden
+                                            üretirsiniz (gerekirse hesap yöneticiniz / NDA süreci).
+                                        </p>
+                                        <a
+                                            href="https://developer.yemeksepeti.com/api-specifications"
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="text-sm font-semibold underline"
+                                            style={{ color: providerColors.fg }}
+                                        >
+                                            Yemeksepeti Partner API →
+                                        </a>
+                                        <p className="text-sm text-gray-600 mt-2">
+                                            Aşağıdaki bilgileri elinizin altında bulundurun:
+                                        </p>
+                                        <ul className="text-sm text-gray-700 list-disc pl-5 space-y-1">
+                                            <li>Client ID + Client Secret (OAuth)</li>
+                                            <li>Chain ID (zincir/marka)</li>
+                                            <li>Vendor ID (Entegratör Restoran ID)</li>
+                                            <li>Webhook için statik token (Partner Portal'da ayarlanır)</li>
+                                        </ul>
+                                    </>
+                                ) : (
+                                    <>
+                                        <p className="text-sm text-gray-600 leading-relaxed">
+                                            Trendyol satıcı panelinizden API erişim bilgilerinizi alın. Bu işlem için
+                                            Trendyol Developer Portal'a giriş yapmanız gerekir.
+                                        </p>
+                                        <a
+                                            href="https://developers.trendyol.com/v2.0/docs/getting-started"
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="text-sm text-[#F27A1A] font-semibold underline"
+                                        >
+                                            Trendyol Developer Portal →
+                                        </a>
+                                        <p className="text-sm text-gray-600 mt-2">
+                                            Aşağıdaki bilgileri elinizin altında bulundurun:
+                                        </p>
+                                        <ul className="text-sm text-gray-700 list-disc pl-5 space-y-1">
+                                            <li>Satıcı ID (Supplier ID)</li>
+                                            <li>API Key</li>
+                                            <li>API Secret</li>
+                                            <li>(Opsiyonel) Hazır Basic Auth Token</li>
+                                        </ul>
+                                    </>
+                                )}
                                 <button
                                     onClick={() => setStep(2)}
                                     className="self-end mt-4 px-5 py-2.5 rounded-xl bg-[#663259] text-white font-bold text-sm hover:shadow-lg hover:shadow-[#663259]/20"
@@ -164,47 +221,52 @@ export default function TrendyolFoodSetup() {
                             <div className="flex flex-col gap-4">
                                 <h2 className="text-xl font-bold text-gray-800">API Bilgileri</h2>
                                 <FormField
-                                    label="Satıcı ID"
-                                    placeholder="örn: 6651369"
+                                    label={labels.account}
+                                    placeholder={labels.accountPh}
                                     value={externalAccountId}
                                     onChange={setExternalAccountId}
                                     required
                                 />
+                                {!isYemeksepeti && (
+                                    <FormField
+                                        label="İşlem E-postası"
+                                        placeholder="ornek@restoran.com — Trendyol GO zorunlu (x-executor-user)"
+                                        value={executorUser}
+                                        onChange={setExecutorUser}
+                                        required
+                                    />
+                                )}
                                 <FormField
-                                    label="İşlem E-postası"
-                                    placeholder="ornek@restoran.com — Trendyol GO zorunlu (x-executor-user)"
-                                    value={executorUser}
-                                    onChange={setExecutorUser}
-                                    required
-                                />
-                                <FormField
-                                    label="Mağaza ID (opsiyonel)"
-                                    placeholder="Ürün/menü eşleştirme için (storeId)"
+                                    label={labels.store}
+                                    placeholder={labels.storePh}
                                     value={externalStoreId}
                                     onChange={setExternalStoreId}
+                                    required={isYemeksepeti}
                                 />
                                 <FormField
-                                    label="API Key"
-                                    placeholder="X8H2IXVvc0TXMFwN0ejq"
+                                    label={labels.apiKey}
+                                    placeholder={labels.apiKeyPh}
                                     value={apiKey}
                                     onChange={setApiKey}
                                     required
                                 />
                                 <FormField
-                                    label="API Secret"
-                                    placeholder="0Boi44McR7LVXLEFPJiV"
+                                    label={labels.apiSecret}
+                                    placeholder={labels.apiSecretPh}
                                     value={apiSecret}
                                     onChange={setApiSecret}
                                     required
                                     isSecret
                                 />
-                                <FormField
-                                    label="Token (opsiyonel)"
-                                    placeholder="WDhIMklYVnZjMFRYTUZ3TjBlanE6..."
-                                    value={token}
-                                    onChange={setToken}
-                                    isSecret
-                                />
+                                {!isYemeksepeti && (
+                                    <FormField
+                                        label="Token (opsiyonel)"
+                                        placeholder="WDhIMklYVnZjMFRYTUZ3TjBlanE6..."
+                                        value={token}
+                                        onChange={setToken}
+                                        isSecret
+                                    />
+                                )}
 
                                 {formError && (
                                     <p className="text-sm text-red-600">{formError}</p>
@@ -233,15 +295,15 @@ export default function TrendyolFoodSetup() {
                             <div className="flex flex-col gap-4">
                                 <h2 className="text-xl font-bold text-gray-800">Bağlantıyı Test Et</h2>
                                 <p className="text-sm text-gray-600">
-                                    Bilgileriniz kaydedildi. Şimdi Trendyol API'sine gerçek bir test çağrısı atalım.
+                                    Bilgileriniz kaydedildi. Şimdi {PROVIDER_LABELS[providerParam]} API'sine gerçek bir test çağrısı atalım.
                                 </p>
                                 <div className="bg-gray-50 rounded-xl p-4 text-sm">
                                     <p className="text-gray-500">Saklanan bilgiler:</p>
                                     <p className="font-mono mt-1">
-                                        Satıcı ID: <span className="font-bold">{createdIntegration.externalAccountId}</span>
+                                        {labels.account}: <span className="font-bold">{createdIntegration.externalAccountId}</span>
                                     </p>
                                     <p className="font-mono">
-                                        API Key: <span className="font-bold">{createdIntegration.apiKeyMasked}</span>
+                                        {labels.apiKey}: <span className="font-bold">{createdIntegration.apiKeyMasked}</span>
                                     </p>
                                 </div>
                                 <button
@@ -265,7 +327,7 @@ export default function TrendyolFoodSetup() {
                                             <p className="font-bold text-emerald-700">Bağlantı başarılı</p>
                                         </div>
                                         <p className="text-sm text-emerald-700">
-                                            Trendyol API'sine başarıyla bağlandık ({testResult.latencyMs} ms).
+                                            {PROVIDER_LABELS[providerParam]} API'sine başarıyla bağlandık ({testResult.latencyMs} ms).
                                         </p>
                                     </div>
                                 ) : (
