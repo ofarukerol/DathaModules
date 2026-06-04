@@ -42,6 +42,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, productToE
     const [category, setCategory] = useState('');
     const [description, setDescription] = useState('');
     const [icon, setIcon] = useState('restaurant');
+    const [unit, setUnit] = useState<Product['unit']>('Adet');
     const [loyaltyPointType, setLoyaltyPointType] = useState<'fixed' | 'percent'>('fixed');
     const [loyaltyPointValue, setLoyaltyPointValue] = useState('');
 
@@ -52,6 +53,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, productToE
             setCategory(productToEdit.category);
             setDescription(productToEdit.description || '');
             setIcon(productToEdit.icon || 'restaurant');
+            setUnit(productToEdit.unit || 'Adet');
             setLoyaltyPointType(productToEdit.loyaltyPointType || 'fixed');
             setLoyaltyPointValue(productToEdit.loyaltyPointValue?.toString() || '');
         } else {
@@ -60,6 +62,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, productToE
             setCategory(categories.length > 0 ? categories[0].id : '');
             setDescription('');
             setIcon('restaurant');
+            setUnit('Adet');
             setLoyaltyPointType('fixed');
             setLoyaltyPointValue('');
         }
@@ -82,6 +85,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, productToE
             category,
             description: description || undefined,
             icon: icon || undefined,
+            unit: unit || 'Adet',
             loyaltyPointType: lpVal > 0 ? loyaltyPointType : undefined,
             loyaltyPointValue: lpVal > 0 ? lpVal : undefined,
         };
@@ -166,6 +170,20 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, productToE
                                 </select>
                             </div>
                         </div>
+                    </div>
+
+                    {/* Unit Selection */}
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2 font-sans">Birim</label>
+                        <select
+                            value={unit || 'Adet'}
+                            onChange={(e) => setUnit(e.target.value as Product['unit'])}
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-[#663259] focus:ring-1 focus:ring-[#663259] outline-none font-medium text-gray-800 transition-all cursor-pointer"
+                        >
+                            {['Adet','Porsiyon','Dilim','Bardak','Şişe','Paket','Tabak','Kase','Kg','Gram','Çift','Paket 6\'lı','Paket 12\'li'].map(u => (
+                                <option key={u} value={u}>{u === 'Kg' ? 'Kg.' : u}</option>
+                            ))}
+                        </select>
                     </div>
 
                     {/* Description */}

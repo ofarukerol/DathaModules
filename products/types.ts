@@ -37,6 +37,7 @@ export interface Product {
     recipeItems?: RecipeItem[];
     packagingItems?: RecipeItem[];
     imageUrl?: string;
+    unit?: string;
     packageCost?: number;
     loyaltyPointType?: 'fixed' | 'percent';
     loyaltyPointValue?: number;

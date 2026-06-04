@@ -1,5 +1,31 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
 
+const ALLOWED_TAGS = new Set(['b', 'i', 'em', 'strong', 'p', 'br', 'ul', 'ol', 'li', 'div', 'span', 'a', 'h1', 'h2', 'h3', 'u', 's']);
+
+function sanitizeHTML(html: string): string {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const walk = (node: Node): void => {
+        const children = Array.from(node.childNodes);
+        for (const child of children) {
+            if (child.nodeType === Node.ELEMENT_NODE) {
+                const el = child as Element;
+                if (!ALLOWED_TAGS.has(el.tagName.toLowerCase())) {
+                    el.replaceWith(...Array.from(el.childNodes));
+                } else {
+                    for (const attr of Array.from(el.attributes)) {
+                        if (attr.name.startsWith('on') || attr.value.startsWith('javascript:')) {
+                            el.removeAttribute(attr.name);
+                        }
+                    }
+                    walk(el);
+                }
+            }
+        }
+    };
+    walk(doc.body);
+    return doc.body.innerHTML;
+}
+
 interface RichTextEditorProps {
     value: string;
     onChange: (html: string) => void;
@@ -51,8 +77,9 @@ export default function RichTextEditor({
     // Sync external value → editor (only on mount or when value changes externally)
     useEffect(() => {
         if (editorRef.current && !isInternalUpdate.current) {
-            if (editorRef.current.innerHTML !== value) {
-                editorRef.current.innerHTML = value;
+            const safe = sanitizeHTML(value);
+            if (editorRef.current.innerHTML !== safe) {
+                editorRef.current.innerHTML = safe;
             }
         }
         isInternalUpdate.current = false;

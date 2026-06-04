@@ -54,6 +54,7 @@ const ProductForm: React.FC = () => {
     const [isRawMaterial, setIsRawMaterial] = useState(false);
     const [recipeItems, setRecipeItems] = useState<RecipeItem[]>([]);
     const [packagingItems, setPackagingItems] = useState<RecipeItem[]>([]);
+    const [unit, setUnit] = useState<Product['unit']>('Adet');
     const [recipeTab, setRecipeTab] = useState<'ingredients' | 'packaging'>('ingredients');
     const [manualCostOverride, setManualCostOverride] = useState(false);
     const [manualTaxOverride, setManualTaxOverride] = useState(false);
@@ -121,6 +122,7 @@ const ProductForm: React.FC = () => {
             setStockQuantity(existingProduct.stockQuantity?.toString() || '0');
             setCriticalStockLevel(existingProduct.criticalStockLevel?.toString() || '0');
             setIcon(existingProduct.icon || 'restaurant');
+            setUnit(existingProduct.unit || 'Adet');
             setImageUrl(existingProduct.imageUrl || '');
             setPackagingItems(existingProduct.packagingItems || []);
             setHasPortion((existingProduct.portions?.length ?? 0) > 0);
@@ -168,6 +170,7 @@ const ProductForm: React.FC = () => {
             aiNote: aiNote.trim() || undefined,
             portions,
             icon,
+            unit: unit || 'Adet',
             imageUrl: imageUrl || undefined,
             isActive,
             showInKitchen,
@@ -580,6 +583,34 @@ const ProductForm: React.FC = () => {
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* Birim Seçimi */}
+                                    <div>
+                                        <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2.5 ml-1">Satış Birimi</label>
+                                        <CustomSelect
+                                            options={[
+                                                { value: 'Adet', label: 'Adet' },
+                                                { value: 'Porsiyon', label: 'Porsiyon' },
+                                                { value: 'Dilim', label: 'Dilim' },
+                                                { value: 'Bardak', label: 'Bardak' },
+                                                { value: 'Şişe', label: 'Şişe' },
+                                                { value: 'Paket', label: 'Paket' },
+                                                { value: 'Tabak', label: 'Tabak' },
+                                                { value: 'Kase', label: 'Kase' },
+                                                { value: 'Kg', label: 'Kg.' },
+                                                { value: 'Gram', label: 'Gram' },
+                                                { value: 'Çift', label: 'Çift' },
+                                                { value: 'Paket 6\'lı', label: 'Paket 6\'lı' },
+                                                { value: 'Paket 12\'li', label: 'Paket 12\'li' },
+                                            ]}
+                                            value={unit || 'Adet'}
+                                            onChange={(val) => setUnit(val as Product['unit'])}
+                                            placeholder="Birim seçin"
+                                            icon="straighten"
+                                            accentColor="#663259"
+                                        />
+                                    </div>
+
                                     <div className="grid grid-cols-3 gap-8">
                                         <div>
                                             <div className="flex items-center justify-between mb-2.5 ml-1">

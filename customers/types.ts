@@ -21,6 +21,17 @@ export interface SpecialOffer {
     createdAt: string;
 }
 
+export interface CustomerAddress {
+    id: string;
+    label: string;
+    il?: string;
+    ilce?: string;
+    mahalle?: string;
+    addressLine1?: string;
+    addressLine2?: string;
+    directions?: string;
+}
+
 export interface Customer {
     id: string;
     name: string;

@@ -44,6 +44,12 @@ function mapLocalToBackendProduct(
     if (typeof prod.stockQuantity === 'number') mapped.stockQty = prod.stockQuantity;
     if (prod.criticalStockLevel != null) mapped.criticalStockLevel = prod.criticalStockLevel;
     if (prod.imageUrl) mapped.imageUrl = prod.imageUrl;
+    if (prod.icon) mapped.icon = prod.icon;
+    if (prod.showInKitchen != null) mapped.showInKitchen = prod.showInKitchen;
+    if (prod.unit) mapped.unit = prod.unit;
+    if (prod.packageCost != null) mapped.packageCost = prod.packageCost;
+    if (prod.isRecipeProduct != null) mapped.isRecipeProduct = prod.isRecipeProduct;
+    if (prod.updatedAt) mapped.updatedAt = prod.updatedAt;
 
     // Portions: DTO ile uyumlu sekil
     if (prod.portions && prod.portions.length > 0) {
