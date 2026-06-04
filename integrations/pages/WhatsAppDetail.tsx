@@ -115,6 +115,32 @@ function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigat
     const [businessInfo, setBusinessInfo] = useState<string>(typeof config.businessInfo === 'string' ? config.businessInfo : '');
     const [savingInfo, setSavingInfo] = useState(false);
 
+    // DAT-242 Paket B — yetkili numaraları (max 3, ilki ana). AI cevaplayamayınca sorar.
+    const initAuthorities = Array.isArray(config.authorityPhones)
+        ? (config.authorityPhones as unknown[]).filter((p): p is string => typeof p === 'string')
+        : [];
+    const [authorityPhones, setAuthorityPhones] = useState<string[]>([
+        initAuthorities[0] ?? '',
+        initAuthorities[1] ?? '',
+        initAuthorities[2] ?? '',
+    ]);
+    const [savingAuthorities, setSavingAuthorities] = useState(false);
+
+    const saveAuthorityPhones = async () => {
+        const cleaned = authorityPhones.map((p) => p.trim()).filter(Boolean);
+        setSavingAuthorities(true);
+        try {
+            await onUpdate(integration.id, {
+                config: { ...latestConfig(), authorityPhones: cleaned },
+            });
+            addToast('success', 'Yetkili numaraları kaydedildi');
+        } catch (err) {
+            addToast('error', err instanceof Error ? err.message : 'Kaydedilemedi');
+        } finally {
+            setSavingAuthorities(false);
+        }
+    };
+
     const saveBusinessInfo = async () => {
         setSavingInfo(true);
         try {
@@ -493,6 +519,49 @@ function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigat
                         className="px-5 py-2.5 rounded-xl bg-[#663259] text-white font-bold text-sm disabled:opacity-50 hover:shadow-lg hover:shadow-[#663259]/20"
                     >
                         {savingAi ? 'Kaydediliyor...' : 'Yapay Zeka Ayarlarını Kaydet'}
+                    </button>
+                </div>
+            </Card>
+
+            {/* DAT-242 Paket B — Yetkili numaraları (AI bilemezse WhatsApp'tan sorar) */}
+            <Card title="Yetkili Numaraları" icon="support_agent">
+                <p className="text-sm text-gray-600 mb-4">
+                    Yapay zeka bir soruyu cevaplayamadığında (örn. özel istek, menüde olmayan bilgi),
+                    soruyu buradaki yetkilinin WhatsApp'ına iletir; yetkilinin cevabını müşteriye otomatik
+                    aktarır. <strong>Ana yetkili 3 dakika içinde yanıtlamazsa</strong> sıradaki yetkiliye sorar.
+                    En fazla 3 numara tanımlanabilir.
+                </p>
+                <div className="flex flex-col gap-3">
+                    {[0, 1, 2].map((i) => (
+                        <div key={i} className="flex flex-col gap-1.5">
+                            <label className="font-bold text-xs text-gray-500 uppercase tracking-wide">
+                                {i === 0 ? 'Ana yetkili' : `${i + 1}. yetkili (yedek)`}
+                            </label>
+                            <input
+                                type="tel"
+                                value={authorityPhones[i]}
+                                onChange={(e) =>
+                                    setAuthorityPhones((prev) => {
+                                        const next = [...prev];
+                                        next[i] = e.target.value;
+                                        return next;
+                                    })
+                                }
+                                placeholder="örn. 905321234567"
+                                className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-mono focus:border-[#663259] focus:ring-1 focus:ring-[#663259] outline-none w-64"
+                            />
+                        </div>
+                    ))}
+                    <p className="text-xs text-gray-400">
+                        Ülke koduyla yazın (Türkiye için 90...). Yetkili, botun gönderdiği soru mesajına
+                        WhatsApp'tan yanıt yazarak cevap verir.
+                    </p>
+                    <button
+                        onClick={saveAuthorityPhones}
+                        disabled={savingAuthorities}
+                        className="self-start px-5 py-2.5 rounded-xl bg-[#663259] text-white font-bold text-sm disabled:opacity-50 hover:shadow-lg hover:shadow-[#663259]/20"
+                    >
+                        {savingAuthorities ? 'Kaydediliyor...' : 'Yetkilileri Kaydet'}
                     </button>
                 </div>
             </Card>
