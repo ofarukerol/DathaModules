@@ -103,6 +103,12 @@ function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigat
     // Bot ayarları (config'den)
     const [minOrderAmount, setMinOrderAmount] = useState<number>(Number(config.minOrderAmount ?? 50));
     const [askPaymentMethod, setAskPaymentMethod] = useState<boolean>(config.askPaymentMethod !== false);
+    // DAT-242 — konuşma tarzı (FRIENDLY/FORMAL/NORMAL); backend prompt üslubunu belirler
+    const [aiTone, setAiTone] = useState<string>(
+        config.aiTone === 'FRIENDLY' || config.aiTone === 'FORMAL' || config.aiTone === 'NORMAL'
+            ? config.aiTone
+            : 'NORMAL',
+    );
     const [savingBot, setSavingBot] = useState(false);
 
     // #3 — mağaza özel bilgisi (serbest metin → AI prompt'una gider)
@@ -268,7 +274,7 @@ function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigat
         setSavingBot(true);
         try {
             await onUpdate(integration.id, {
-                config: { ...latestConfig(), minOrderAmount, askPaymentMethod },
+                config: { ...latestConfig(), minOrderAmount, askPaymentMethod, aiTone },
             });
             addToast('success', 'Bot ayarları kaydedildi');
         } catch (err) {
@@ -384,6 +390,25 @@ function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigat
                         enabled={askPaymentMethod}
                         onToggle={() => setAskPaymentMethod((v) => !v)}
                     />
+
+                    {/* DAT-242 — konuşma tarzı */}
+                    <div className="flex flex-col gap-1.5">
+                        <label className="font-bold text-sm text-gray-700">Konuşma tarzı</label>
+                        <div className="w-64">
+                            <CustomSelect
+                                options={[
+                                    { value: 'FRIENDLY', label: 'Samimi', icon: 'sentiment_satisfied' },
+                                    { value: 'NORMAL', label: 'Normal (ideal)', icon: 'balance' },
+                                    { value: 'FORMAL', label: 'Resmi', icon: 'business_center' },
+                                ]}
+                                value={aiTone}
+                                onChange={setAiTone}
+                                placeholder="Tarz seçin"
+                                accentColor="#663259"
+                            />
+                        </div>
+                        <p className="text-xs text-gray-500">Botun müşteriye yanıt verirken kullanacağı üslup.</p>
+                    </div>
 
                     <button
                         onClick={saveBotSettings}
