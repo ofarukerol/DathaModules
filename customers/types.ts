@@ -23,13 +23,14 @@ export interface SpecialOffer {
 
 export interface CustomerAddress {
     id: string;
-    label: string;
+    label?: string;
     il?: string;
     ilce?: string;
     mahalle?: string;
     addressLine1?: string;
     addressLine2?: string;
     directions?: string;
+    isDefault?: boolean;
 }
 
 export interface Customer {
@@ -61,18 +62,6 @@ export interface Customer {
     loyaltyPoints?: number;
     specialOffers?: SpecialOffer[];
     addresses?: CustomerAddress[];
-}
-
-export interface CustomerAddress {
-    id: string;
-    label?: string;
-    mahalle?: string;
-    addressLine1?: string;
-    addressLine2?: string;
-    il?: string;
-    ilce?: string;
-    directions?: string;
-    isDefault?: boolean;
 }
 
 export interface NonPayableReason {
