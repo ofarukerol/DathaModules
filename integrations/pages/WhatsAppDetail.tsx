@@ -14,6 +14,7 @@ import MapPickerModal from '@/components/modals/MapPickerModal';
 import CustomSelect from '@/components/CustomSelect';
 import { aiKeysApi, type AiProviderKey } from '../services/aiKeysApi';
 import { AI_PROVIDERS, isAiProviderKey, buildProviderRecord } from '../config/aiProviders';
+import { whatsappKnowledgeApi, type KnowledgeDoc } from '../services/whatsappKnowledgeApi';
 
 // Backend sabit verify token (env WHATSAPP_VERIFY_TOKEN). Meta'ya bu değer girilir.
 const BACKEND_VERIFY_TOKEN = 'datha-webhook-verify';
@@ -114,6 +115,61 @@ function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigat
     // #3 — mağaza özel bilgisi (serbest metin → AI prompt'una gider)
     const [businessInfo, setBusinessInfo] = useState<string>(typeof config.businessInfo === 'string' ? config.businessInfo : '');
     const [savingInfo, setSavingInfo] = useState(false);
+
+    // DAT-242 — WhatsApp bot bilgi tabanı (RAG dokümanları)
+    const [knowledgeDocs, setKnowledgeDocs] = useState<KnowledgeDoc[]>([]);
+    const [kbTitle, setKbTitle] = useState('');
+    const [kbContent, setKbContent] = useState('');
+    const [kbSaving, setKbSaving] = useState(false);
+    const [kbDeletingId, setKbDeletingId] = useState<string | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        whatsappKnowledgeApi
+            .list()
+            .then((docs) => {
+                if (!cancelled) setKnowledgeDocs(docs);
+            })
+            .catch(() => {
+                /* henüz doküman yoksa veya yetki yoksa sessizce boş kalır */
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    const addKnowledge = async () => {
+        if (!kbTitle.trim() || !kbContent.trim()) {
+            addToast('error', 'Başlık ve içerik zorunludur.');
+            return;
+        }
+        setKbSaving(true);
+        try {
+            await whatsappKnowledgeApi.create(kbTitle.trim(), kbContent.trim());
+            const docs = await whatsappKnowledgeApi.list();
+            setKnowledgeDocs(docs);
+            setKbTitle('');
+            setKbContent('');
+            addToast('success', 'Bilgi tabanına eklendi');
+        } catch (err) {
+            addToast('error', err instanceof Error ? err.message : 'Eklenemedi');
+        } finally {
+            setKbSaving(false);
+        }
+    };
+
+    const removeKnowledge = async (id: string) => {
+        setKbDeletingId(id);
+        try {
+            await whatsappKnowledgeApi.remove(id);
+            setKnowledgeDocs((prev) => prev.filter((d) => d.id !== id));
+            addToast('success', 'Doküman silindi');
+        } catch (err) {
+            addToast('error', err instanceof Error ? err.message : 'Silinemedi');
+        } finally {
+            setKbDeletingId(null);
+        }
+    };
 
     // DAT-242 Paket B — yetkili numaraları (max 3, ilki ana). AI cevaplayamayınca sorar.
     const initAuthorities = Array.isArray(config.authorityPhones)
@@ -520,6 +576,70 @@ function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigat
                     >
                         {savingAi ? 'Kaydediliyor...' : 'Yapay Zeka Ayarlarını Kaydet'}
                     </button>
+                </div>
+            </Card>
+
+            {/* DAT-242 — Bilgi Tabanı (bot bu dokümanlardan cevap verir; RAG) */}
+            <Card title="Bilgi Tabanı" icon="menu_book">
+                <p className="text-sm text-gray-600 mb-4">
+                    Botun müşteri sorularında kullanacağı dokümanlar (SSS, kampanya, teslimat
+                    politikası, sık sorulan özel bilgiler). Eklediğiniz metin bot tarafından otomatik
+                    işlenir; müşteri ilgili bir soru sorduğunda bot öncelikle buradan cevap verir.
+                    Burada olmayan bilgiyi uydurmaz.
+                </p>
+
+                {knowledgeDocs.length > 0 && (
+                    <div className="flex flex-col gap-2 mb-4">
+                        {knowledgeDocs.map((doc) => (
+                            <div
+                                key={doc.id}
+                                className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 px-4 py-2.5"
+                            >
+                                <div className="min-w-0">
+                                    <p className="text-sm font-bold text-gray-800 truncate">{doc.title}</p>
+                                    <p className="text-xs text-gray-400">
+                                        {doc.chunkCount} parça · {doc.status === 'INDEXED' ? 'hazır' : doc.status}
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => removeKnowledge(doc.id)}
+                                    disabled={kbDeletingId === doc.id}
+                                    className="text-sm text-red-500 hover:text-red-600 font-medium disabled:opacity-40 shrink-0"
+                                >
+                                    {kbDeletingId === doc.id ? 'Siliniyor...' : 'Sil'}
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                    <input
+                        type="text"
+                        value={kbTitle}
+                        onChange={(e) => setKbTitle(e.target.value)}
+                        maxLength={120}
+                        placeholder="Başlık (örn. Teslimat Bölgeleri)"
+                        className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-[#663259] focus:ring-1 focus:ring-[#663259] outline-none"
+                    />
+                    <textarea
+                        value={kbContent}
+                        onChange={(e) => setKbContent(e.target.value)}
+                        rows={4}
+                        maxLength={8000}
+                        placeholder={'İçerik (örn. Sadece merkez ilçeye teslimat yapıyoruz. Hafta içi 11:00-22:00 arası. Min. sipariş 50₺.)'}
+                        className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-[#663259] focus:ring-1 focus:ring-[#663259] outline-none resize-y"
+                    />
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-400">{kbContent.length}/8000</span>
+                        <button
+                            onClick={addKnowledge}
+                            disabled={kbSaving}
+                            className="px-5 py-2.5 rounded-xl bg-[#663259] text-white font-bold text-sm disabled:opacity-50 hover:shadow-lg hover:shadow-[#663259]/20"
+                        >
+                            {kbSaving ? 'Ekleniyor...' : 'Bilgi Ekle'}
+                        </button>
+                    </div>
                 </div>
             </Card>
 
