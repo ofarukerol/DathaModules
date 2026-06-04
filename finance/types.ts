@@ -87,6 +87,7 @@ export interface FinanceCategory {
 
 export interface FinanceTransaction {
     id: string;
+    localId?: string;
     company_id?: string;
     category_id?: string;
     employee_id?: string;

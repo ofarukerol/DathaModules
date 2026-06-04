@@ -21,7 +21,7 @@ function mapView(v: CompanyView): Company {
         email: v.email ?? undefined,
         address: v.address ?? undefined,
         city: v.city ?? undefined,
-        balance: v.balance,
+        balance: Math.round(v.balance ?? 0) / 100, // backend kurus -> frontend lira
         notes: v.notes ?? undefined,
         created_at: v.createdAt,
         updated_at: v.updatedAt,
