@@ -108,6 +108,7 @@ export interface FinanceTransaction {
 
 export interface BankAccount {
     id: string;
+    localId?: string;
     name: string;
     bank_name: string;
     iban?: string;
@@ -123,6 +124,7 @@ export interface BankAccount {
 
 export interface BankTransaction {
     id: string;
+    localId?: string;
     bank_account_id: string;
     company_id?: string;
     type: BankTransactionType;
@@ -139,6 +141,7 @@ export interface BankTransaction {
 
 export interface Invoice {
     id: string;
+    localId?: string;
     company_id: string;
     invoice_number: string;
     invoice_no: string;
@@ -206,6 +209,7 @@ export const CHECK_STATUS_LABELS: Record<CheckStatus, string> = {
 
 export interface CheckNote {
     id: string;
+    localId?: string;
     type: CheckType;
     company_id?: string;
     amount: number;

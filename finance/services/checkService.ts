@@ -1,8 +1,9 @@
-import { getDb } from '../../_shared/db';
-import api from '../../_shared/api';
-import { generateId, nowISO } from '../../_shared/helpers';
+// Cek/Senet servisi — DathaModules submodule (Manager + Desktop ORTAK). Gercek backend ile senkron.
+// CheckType (CHECK_RECEIVED/...) <-> backend type(RECEIVED/ISSUED) + instrument(CHECK/NOTE).
+import { generateId } from '../../_shared/helpers';
 import type { CheckNote, CheckType, CheckStatus } from '../types';
-import { enqueueSync } from '../../../utils/syncQueue';
+import type { CheckView, CompanyView } from '@/types/backend/finance';
+import { toLira, toKurus, dateOnly, getList, pushOp } from './_financeSync';
 
 export interface CheckStats {
     receivedTotal: number;
@@ -16,56 +17,50 @@ export interface CheckStats {
     cashConversionRate: number;
 }
 
-const DEMO_CHECKS: CheckNote[] = (() => {
-    const today = new Date();
-    const d = (offset: number) => {
-        const dt = new Date(today);
-        dt.setDate(dt.getDate() + offset);
-        return dt.toISOString().split('T')[0];
+function splitType(t: CheckType): { type: 'RECEIVED' | 'ISSUED'; instrument: 'CHECK' | 'NOTE' } {
+    return {
+        type: t.endsWith('RECEIVED') ? 'RECEIVED' : 'ISSUED',
+        instrument: t.startsWith('NOTE') ? 'NOTE' : 'CHECK',
     };
-    return [
-        { id: 'demo-chk-1', type: 'CHECK_RECEIVED' as CheckType, amount: 15000, currency: 'TRY', issue_date: d(-30), due_date: d(5), status: 'PENDING' as CheckStatus, bank_name: 'Yapı Kredi', check_number: 'ÇK-2026-001', company_name: 'Taze Gıda A.Ş.', notes: 'Mart ayı tedarik ödemesi', created_at: d(-30), updated_at: d(-30) },
-        { id: 'demo-chk-2', type: 'CHECK_ISSUED' as CheckType, amount: 8500, currency: 'TRY', issue_date: d(-15), due_date: d(12), status: 'PENDING' as CheckStatus, bank_name: 'Akbank', check_number: 'ÇK-2026-002', company_name: 'Metro Toptancı', notes: 'İçecek siparişi', created_at: d(-15), updated_at: d(-15) },
-        { id: 'demo-chk-3', type: 'NOTE_RECEIVED' as CheckType, amount: 22000, currency: 'TRY', issue_date: d(-45), due_date: d(-3), status: 'PENDING' as CheckStatus, bank_name: 'Garanti BBVA', check_number: 'SN-2026-001', company_name: 'Lezzet Catering', notes: 'Catering sözleşmesi', created_at: d(-45), updated_at: d(-45) },
-        { id: 'demo-chk-4', type: 'CHECK_RECEIVED' as CheckType, amount: 9800, currency: 'TRY', issue_date: d(-20), due_date: d(25), status: 'PENDING' as CheckStatus, bank_name: 'İş Bankası', check_number: 'ÇK-2026-003', company_name: 'Anadolu Et', notes: 'Et tedarik ödemesi', created_at: d(-20), updated_at: d(-20) },
-        { id: 'demo-chk-5', type: 'CHECK_RECEIVED' as CheckType, amount: 6500, currency: 'TRY', issue_date: d(-60), due_date: d(-40), status: 'CASHED' as CheckStatus, bank_name: 'Yapı Kredi', check_number: 'ÇK-2026-004', company_name: 'ABC Tedarik', notes: 'Tahsil edildi', created_at: d(-60), updated_at: d(-40) },
-    ] as CheckNote[];
-})();
+}
 
-const DEMO_CHECK_STATS: CheckStats = {
-    receivedTotal: 46800,
-    receivedCount: 3,
-    issuedTotal: 8500,
-    issuedCount: 1,
-    pendingCount: 4,
-    overdueCount: 1,
-    dueThisWeekTotal: 15000,
-    dueThisWeekCount: 1,
-    cashConversionRate: 25,
-};
+function joinType(type: string, instrument: string): CheckType {
+    const dir = type === 'RECEIVED' ? 'RECEIVED' : 'ISSUED';
+    const ins = instrument === 'NOTE' ? 'NOTE' : 'CHECK';
+    return `${ins}_${dir}` as CheckType;
+}
+
+function mapView(v: CheckView, companyNames: Map<string, string>): CheckNote {
+    return {
+        id: v.id,
+        localId: v.localId ?? undefined,
+        type: joinType(v.type, v.instrument),
+        company_id: v.companyId ?? undefined,
+        amount: toLira(v.amount),
+        currency: v.currency ?? 'TRY',
+        issue_date: dateOnly(v.issueDate),
+        due_date: dateOnly(v.dueDate),
+        status: v.status as CheckStatus,
+        bank_name: v.bankName ?? undefined,
+        check_number: v.checkNumber ?? undefined,
+        notes: v.notes ?? undefined,
+        endorser: v.endorser ?? undefined,
+        created_at: v.createdAt,
+        updated_at: v.updatedAt,
+        company_name: v.companyId ? companyNames.get(v.companyId) : undefined,
+    };
+}
+
+const RECEIVED: CheckType[] = ['CHECK_RECEIVED', 'NOTE_RECEIVED'];
 
 export const checkService = {
     async fetchAll(): Promise<CheckNote[]> {
-        const db = await getDb();
-        if (!db) {
-            try {
-                const res = await api.get('/finance/checks');
-                const data = res.data;
-                const arr = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
-                return arr.length > 0 ? arr : DEMO_CHECKS;
-            } catch { return DEMO_CHECKS; }
-        }
-        const result = await db.select<CheckNote[]>(
-            `SELECT ch.id, ch.type, ch.company_id, ch.amount, ch.currency,
-                    ch.issue_date, ch.due_date, ch.status, ch.bank_name,
-                    ch.check_number, ch.notes, ch.endorser,
-                    ch.created_at, ch.updated_at,
-                    c.name as company_name
-             FROM checks ch
-             LEFT JOIN companies c ON ch.company_id = c.id
-             ORDER BY ch.due_date ASC`
-        );
-        return result.length > 0 ? result : DEMO_CHECKS;
+        const [rows, companies] = await Promise.all([
+            getList<CheckView>('/finance/checks'),
+            getList<CompanyView>('/finance/companies'),
+        ]);
+        const names = new Map(companies.map((c) => [c.id, c.name]));
+        return rows.map((r) => mapView(r, names));
     },
 
     async create(data: {
@@ -80,121 +75,65 @@ export const checkService = {
         notes?: string;
         endorser?: string;
     }): Promise<string> {
-        const db = await getDb();
-        if (!db) {
-            const res = await api.post('/finance/checks', data);
-            const result = res.data?.data ?? res.data;
-            if (result?.id) return result.id;
-            throw new Error('API: Cek/senet olusturulamadi');
-        }
-
-        const id = generateId();
-        const now = nowISO();
-        await db.execute(
-            `INSERT INTO checks (id, type, company_id, amount, currency, issue_date, due_date, status, bank_name, check_number, notes, endorser, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING', $8, $9, $10, $11, $12, $13)`,
-            [id, data.type, data.company_id ?? null, data.amount, data.currency ?? 'TRY',
-             data.issue_date, data.due_date, data.bank_name ?? null, data.check_number ?? null,
-             data.notes ?? null, data.endorser ?? null, now, now]
-        );
-        await enqueueSync('CHECK_CREATED', {
-            localId: id, type: data.type, amount: data.amount,
-            issueDate: data.issue_date, dueDate: data.due_date,
-            companyId: data.company_id, bankName: data.bank_name,
-            checkNumber: data.check_number, notes: data.notes,
+        const localId = generateId();
+        const st = splitType(data.type);
+        const serverId = await pushOp('check', 'UPSERT', localId, {
+            type: st.type,
+            instrument: st.instrument,
+            companyId: data.company_id ?? null,
+            amount: toKurus(data.amount),
+            currency: data.currency ?? 'TRY',
+            issueDate: data.issue_date,
+            dueDate: data.due_date,
+            bankName: data.bank_name ?? null,
+            checkNumber: data.check_number ?? null,
+            notes: data.notes ?? null,
+            endorser: data.endorser ?? null,
+            status: 'PENDING',
         });
-        return id;
+        return serverId ?? localId;
     },
 
     async updateStatus(id: string, status: CheckStatus): Promise<void> {
-        const db = await getDb();
-        if (!db) {
-            await api.patch(`/finance/checks/${id}/status`, { status });
-            return;
-        }
-        await db.execute(
-            'UPDATE checks SET status = $2, updated_at = $3 WHERE id = $1',
-            [id, status, nowISO()]
-        );
-        await enqueueSync('CHECK_UPDATED', { localId: id, status });
+        const localId = await this._localId(id);
+        await pushOp('check', 'UPSERT', localId, { status });
     },
 
     async deleteCheck(id: string): Promise<void> {
-        const db = await getDb();
-        if (!db) {
-            await api.delete(`/finance/checks/${id}`);
-            return;
-        }
-        await db.execute('DELETE FROM checks WHERE id = $1', [id]);
+        const localId = await this._localId(id);
+        await pushOp('check', 'DELETE', localId);
     },
 
     async fetchStats(): Promise<CheckStats> {
-        const db = await getDb();
-        if (!db) {
-            try {
-                const res = await api.get('/finance/checks/stats');
-                const data = res.data?.data ?? res.data;
-                return data ?? DEMO_CHECK_STATS;
-            } catch { return DEMO_CHECK_STATS; }
-        }
-
+        const list = await this.fetchAll();
         const today = new Date();
         const todayStr = today.toISOString().split('T')[0];
         const weekLater = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-        // Alınan çekler (PENDING)
-        const received = await db.select<[{ total: number; cnt: number }]>(
-            `SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as cnt FROM checks WHERE type IN ('CHECK_RECEIVED', 'NOTE_RECEIVED') AND status = 'PENDING'`
-        );
-
-        // Verilen çekler (PENDING)
-        const issued = await db.select<[{ total: number; cnt: number }]>(
-            `SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as cnt FROM checks WHERE type IN ('CHECK_ISSUED', 'NOTE_ISSUED') AND status = 'PENDING'`
-        );
-
-        // Bekleyen toplam
-        const pending = await db.select<[{ cnt: number }]>(
-            `SELECT COUNT(*) as cnt FROM checks WHERE status = 'PENDING'`
-        );
-
-        // Vadesi geçen
-        const overdue = await db.select<[{ cnt: number }]>(
-            `SELECT COUNT(*) as cnt FROM checks WHERE status = 'PENDING' AND due_date < $1`,
-            [todayStr]
-        );
-
-        // Bu hafta vadesi gelenler
-        const dueWeek = await db.select<[{ total: number; cnt: number }]>(
-            `SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as cnt FROM checks WHERE status = 'PENDING' AND due_date >= $1 AND due_date <= $2`,
-            [todayStr, weekLater]
-        );
-
-        // Nakite dönüşüm oranı: tahsil edilen / (tahsil edilen + bekleyen alınan)
-        const cashedReceived = await db.select<[{ total: number }]>(
-            `SELECT COALESCE(SUM(amount), 0) as total FROM checks WHERE type IN ('CHECK_RECEIVED', 'NOTE_RECEIVED') AND status = 'CASHED'`
-        );
-        const allReceived = await db.select<[{ total: number }]>(
-            `SELECT COALESCE(SUM(amount), 0) as total FROM checks WHERE type IN ('CHECK_RECEIVED', 'NOTE_RECEIVED')`
-        );
-        const allReceivedTotal = allReceived[0]?.total || 0;
-        const cashedTotal = cashedReceived[0]?.total || 0;
-        const cashConversionRate = allReceivedTotal > 0 ? Math.round((cashedTotal / allReceivedTotal) * 100) : 0;
-
-        const stats = {
-            receivedTotal: received[0]?.total || 0,
-            receivedCount: received[0]?.cnt || 0,
-            issuedTotal: issued[0]?.total || 0,
-            issuedCount: issued[0]?.cnt || 0,
-            pendingCount: pending[0]?.cnt || 0,
-            overdueCount: overdue[0]?.cnt || 0,
-            dueThisWeekTotal: dueWeek[0]?.total || 0,
-            dueThisWeekCount: dueWeek[0]?.cnt || 0,
-            cashConversionRate,
+        const isReceived = (c: CheckNote) => RECEIVED.includes(c.type);
+        const pending = list.filter((c) => c.status === 'PENDING');
+        const recv = pending.filter(isReceived);
+        const iss = pending.filter((c) => !isReceived(c));
+        const dueWeek = pending.filter((c) => c.due_date >= todayStr && c.due_date <= weekLater);
+        const sum = (arr: CheckNote[]) => arr.reduce((s, c) => s + c.amount, 0);
+        const allRecv = list.filter(isReceived);
+        const cashedRecv = allRecv.filter((c) => c.status === 'CASHED');
+        const allRecvTotal = sum(allRecv);
+        const rate = allRecvTotal > 0 ? Math.round((sum(cashedRecv) / allRecvTotal) * 100) : 0;
+        return {
+            receivedTotal: sum(recv),
+            receivedCount: recv.length,
+            issuedTotal: sum(iss),
+            issuedCount: iss.length,
+            pendingCount: pending.length,
+            overdueCount: pending.filter((c) => c.due_date < todayStr).length,
+            dueThisWeekTotal: sum(dueWeek),
+            dueThisWeekCount: dueWeek.length,
+            cashConversionRate: rate,
         };
+    },
 
-        if (stats.receivedCount === 0 && stats.issuedCount === 0 && stats.pendingCount === 0) {
-            return DEMO_CHECK_STATS;
-        }
-        return stats;
+    async _localId(id: string): Promise<string> {
+        const rows = await getList<CheckView>('/finance/checks');
+        return rows.find((r) => r.id === id)?.localId ?? id;
     },
 };
