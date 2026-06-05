@@ -277,6 +277,7 @@ function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigat
 
     // Token güncelleme
     const [newToken, setNewToken] = useState('');
+    const [showToken, setShowToken] = useState(false);
     const [savingToken, setSavingToken] = useState(false);
 
     const saveBotSettings = async () => {
@@ -361,13 +362,26 @@ function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigat
                         : 'Henüz token girilmemiş. Meta\'dan aldığınız access token\'ı girin.'}
                 </p>
                 <div className="flex items-stretch gap-2">
-                    <input
-                        type="password"
-                        value={newToken}
-                        onChange={(e) => setNewToken(e.target.value)}
-                        placeholder="Yeni access token (EAAxxx...)"
-                        className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-mono focus:border-[#663259] focus:ring-1 focus:ring-[#663259] outline-none"
-                    />
+                    <div className="relative flex-1">
+                        <input
+                            type={showToken ? 'text' : 'password'}
+                            value={newToken}
+                            onChange={(e) => setNewToken(e.target.value)}
+                            placeholder="Yeni access token (EAAxxx...)"
+                            className="w-full rounded-xl border border-gray-200 pl-4 pr-11 py-2.5 text-sm font-mono focus:border-[#663259] focus:ring-1 focus:ring-[#663259] outline-none"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowToken((v) => !v)}
+                            title={showToken ? 'Gizle' : 'Göster'}
+                            aria-label={showToken ? 'Token gizle' : 'Token göster'}
+                            className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-[#663259] hover:bg-gray-100 transition-colors"
+                        >
+                            <span className="material-symbols-outlined text-[20px]">
+                                {showToken ? 'visibility_off' : 'visibility'}
+                            </span>
+                        </button>
+                    </div>
                     <button
                         onClick={saveToken}
                         disabled={!newToken.trim() || savingToken}
