@@ -356,9 +356,28 @@ function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigat
 
             {/* Access token güncelleme */}
             <Card title="Access Token" icon="key">
+                {/* Mevcut token durumu — güvenlik gereği token'ın kendisi gösterilmez,
+                    sadece girili/aktif olup olmadığı belirtilir. */}
+                {integration.hasToken ? (
+                    <div
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold mb-3 ${
+                            isConnected ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                        }`}
+                    >
+                        <span className="material-symbols-outlined text-[16px]">
+                            {isConnected ? 'check_circle' : 'schedule'}
+                        </span>
+                        {isConnected ? 'Token girili ve aktif' : 'Token girili (bağlantı doğrulanıyor)'}
+                    </div>
+                ) : (
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold mb-3 bg-gray-100 text-gray-500">
+                        <span className="material-symbols-outlined text-[16px]">cancel</span>
+                        Token girilmemiş
+                    </div>
+                )}
                 <p className="text-sm text-gray-600 mb-3">
                     {integration.hasToken
-                        ? 'Token kayıtlı. Süresi dolduysa (bot cevap vermiyorsa) Meta\'dan yeni bir kalıcı System User token alıp güncelleyin.'
+                        ? 'Token güvenli şekilde şifreli saklanır ve tekrar gösterilmez. Süresi dolduysa (bot cevap vermiyorsa) Meta\'dan yeni bir kalıcı System User token alıp aşağıdan güncelleyin.'
                         : 'Henüz token girilmemiş. Meta\'dan aldığınız access token\'ı girin.'}
                 </p>
                 <div className="flex items-stretch gap-2">
