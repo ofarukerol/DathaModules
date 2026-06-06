@@ -520,6 +520,15 @@ function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigat
                     işlenir; müşteri ilgili bir soru sorduğunda bot öncelikle buradan cevap verir.
                     Burada olmayan bilgiyi uydurmaz.
                 </p>
+                <div className="flex items-start gap-2 mb-4 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-100">
+                    <span className="material-symbols-outlined text-[18px] text-amber-600 mt-0.5">info</span>
+                    <p className="text-xs text-amber-700">
+                        Bu özellik metni anlamlandırmak için <strong>OpenAI</strong> kullanır. Kayıt
+                        "FAILED" oluyorsa, <strong>Tanımlamalar &gt; Yapay Zeka</strong> sekmesinden
+                        geçerli bir <strong>OpenAI API anahtarı</strong> girip "Test Et" ile doğrulayın
+                        (bot sohbeti başka sağlayıcı kullansa bile bilgi tabanı OpenAI gerektirir).
+                    </p>
+                </div>
 
                 {knowledgeDocs.length > 0 && (
                     <div className="flex flex-col gap-2 mb-4">
