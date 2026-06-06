@@ -3,14 +3,14 @@
 // BIRIM: backend kurus (int), frontend lira (formatCurrency lira gosterir) -> sinirda *100 / /100.
 // Enrichment (kategori adi/ikon/renk, cari adi) client-side join ile yapilir (backend bare doner).
 import api from '../../_shared/api';
-import { generateId, nowISO } from '../../_shared/helpers';
+import { generateId } from '../../_shared/helpers';
 import type { FinanceCategory, FinanceTransaction, TransactionType, PaymentMethod } from '../types';
 import type {
     FinanceTransactionView,
     FinanceCategoryView,
     CompanyView,
-    FinanceSyncOpResult,
 } from '@/types/backend/finance';
+import { toLira, toKurus, dateOnly, getList, pushOp, unwrap } from './_financeSync';
 
 interface TransactionFilters {
     type?: TransactionType | '';
@@ -18,29 +18,6 @@ interface TransactionFilters {
     dateTo?: string;
     companyId?: string;
     categoryId?: string;
-}
-
-const toLira = (kurus: number | null | undefined): number => Math.round(kurus ?? 0) / 100;
-const toKurus = (lira: number | null | undefined): number => Math.round((lira ?? 0) * 100);
-const dateOnly = (iso: string): string => (iso ? iso.split('T')[0] : iso);
-
-function unwrap<T>(payload: unknown): T | undefined {
-    if (payload && typeof payload === 'object' && 'data' in payload) {
-        return (payload as { data: T }).data;
-    }
-    return payload as T;
-}
-
-async function pushTransactionOp(
-    op: 'UPSERT' | 'DELETE',
-    localId: string,
-    data?: Record<string, unknown>,
-): Promise<string | null> {
-    const res = await api.post('/finance/sync/push', {
-        ops: [{ entity: 'transaction', op, localId, updatedAt: nowISO(), data }],
-    });
-    const result = unwrap<{ results?: FinanceSyncOpResult[] }>(res.data);
-    return result?.results?.[0]?.serverId ?? null;
 }
 
 function mapCategory(v: FinanceCategoryView): FinanceCategory {
@@ -74,37 +51,23 @@ function mapTransaction(v: FinanceTransactionView): FinanceTransaction {
 }
 
 async function fetchCompanyNameMap(): Promise<Map<string, string>> {
-    try {
-        const res = await api.get('/finance/companies');
-        const raw = unwrap<CompanyView[]>(res.data) ?? [];
-        return new Map(raw.map((c) => [c.id, c.name]));
-    } catch {
-        return new Map();
-    }
+    const raw = await getList<CompanyView>('/finance/companies');
+    return new Map(raw.map((c) => [c.id, c.name]));
 }
 
 export const financeService = {
     async fetchCategories(type?: TransactionType | ''): Promise<FinanceCategory[]> {
-        try {
-            const res = await api.get('/finance/categories');
-            let list = (unwrap<FinanceCategoryView[]>(res.data) ?? []).map(mapCategory);
-            if (type) list = list.filter((c) => c.type === type);
-            return list;
-        } catch {
-            return [];
-        }
+        let list = (await getList<FinanceCategoryView>('/finance/categories')).map(mapCategory);
+        if (type) list = list.filter((c) => c.type === type);
+        return list;
     },
 
     async createCategory(data: { name: string; type: TransactionType; icon?: string; color?: string }): Promise<string> {
         const localId = generateId();
-        const res = await api.post('/finance/sync/push', {
-            ops: [{
-                entity: 'category', op: 'UPSERT', localId, updatedAt: nowISO(),
-                data: { name: data.name, type: data.type, icon: data.icon ?? null, color: data.color ?? null },
-            }],
+        const serverId = await pushOp('category', 'UPSERT', localId, {
+            name: data.name, type: data.type, icon: data.icon ?? null, color: data.color ?? null,
         });
-        const result = unwrap<{ results?: FinanceSyncOpResult[] }>(res.data);
-        return result?.results?.[0]?.serverId ?? localId;
+        return serverId ?? localId;
     },
 
     /** Gelir/gider islemleri — kategori + cari adlariyla zenginlestirilmis. */
@@ -129,17 +92,14 @@ export const financeService = {
 
     /** Ham islem listesi (enrichment'siz) — ozet/grafik hesaplari icin. */
     async _rawTransactions(filters: TransactionFilters = {}): Promise<FinanceTransaction[]> {
-        try {
-            const res = await api.get('/finance/transactions');
-            let list = (unwrap<FinanceTransactionView[]>(res.data) ?? []).map(mapTransaction);
+        {
+            let list = (await getList<FinanceTransactionView>('/finance/transactions')).map(mapTransaction);
             if (filters.type) list = list.filter((t) => t.type === filters.type);
             if (filters.dateFrom) list = list.filter((t) => t.date >= filters.dateFrom!);
             if (filters.dateTo) list = list.filter((t) => t.date <= filters.dateTo!);
             if (filters.companyId) list = list.filter((t) => t.company_id === filters.companyId);
             if (filters.categoryId) list = list.filter((t) => t.category_id === filters.categoryId);
             return list;
-        } catch {
-            return [];
         }
     },
 
@@ -155,7 +115,7 @@ export const financeService = {
         payment_method?: PaymentMethod;
     }): Promise<string> {
         const localId = generateId();
-        const serverId = await pushTransactionOp('UPSERT', localId, {
+        const serverId = await pushOp('transaction', 'UPSERT', localId, {
             type: data.type,
             amount: toKurus(data.amount),
             currency: data.currency ?? 'TRY',
@@ -180,11 +140,11 @@ export const financeService = {
         if (data.company_id !== undefined) payload.companyId = data.company_id ?? null;
         if (data.payment_method !== undefined) payload.paymentMethod = data.payment_method ?? null;
         if (data.employee_id !== undefined) payload.employeeId = data.employee_id ?? null;
-        await pushTransactionOp('UPSERT', localId ?? id, payload);
+        await pushOp('transaction', 'UPSERT', localId ?? id, payload);
     },
 
     async deleteTransaction(id: string, localId?: string): Promise<void> {
-        await pushTransactionOp('DELETE', localId ?? id);
+        await pushOp('transaction', 'DELETE', localId ?? id);
     },
 
     async getPayrollPayments(month: number, year: number): Promise<{ employee_id: string; total_paid: number }[]> {
