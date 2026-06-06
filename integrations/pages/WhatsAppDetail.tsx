@@ -122,6 +122,7 @@ function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigat
     const [kbContent, setKbContent] = useState('');
     const [kbSaving, setKbSaving] = useState(false);
     const [kbDeletingId, setKbDeletingId] = useState<string | null>(null);
+    const [kbEditingId, setKbEditingId] = useState<string | null>(null); // dolu = düzenleme modu
 
     useEffect(() => {
         let cancelled = false;
@@ -138,21 +139,38 @@ function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigat
         };
     }, []);
 
-    const addKnowledge = async () => {
+    const startEditKnowledge = (doc: KnowledgeDoc) => {
+        setKbEditingId(doc.id);
+        setKbTitle(doc.title);
+        setKbContent(doc.content ?? '');
+    };
+
+    const cancelEditKnowledge = () => {
+        setKbEditingId(null);
+        setKbTitle('');
+        setKbContent('');
+    };
+
+    const saveKnowledge = async () => {
         if (!kbTitle.trim() || !kbContent.trim()) {
             addToast('error', 'Başlık ve içerik zorunludur.');
             return;
         }
         setKbSaving(true);
         try {
-            await whatsappKnowledgeApi.create(kbTitle.trim(), kbContent.trim());
+            if (kbEditingId) {
+                await whatsappKnowledgeApi.update(kbEditingId, kbTitle.trim(), kbContent.trim());
+            } else {
+                await whatsappKnowledgeApi.create(kbTitle.trim(), kbContent.trim());
+            }
             const docs = await whatsappKnowledgeApi.list();
             setKnowledgeDocs(docs);
+            setKbEditingId(null);
             setKbTitle('');
             setKbContent('');
-            addToast('success', 'Bilgi tabanına eklendi');
+            addToast('success', kbEditingId ? 'Doküman güncellendi' : 'Bilgi tabanına eklendi');
         } catch (err) {
-            addToast('error', err instanceof Error ? err.message : 'Eklenemedi');
+            addToast('error', err instanceof Error ? err.message : 'Kaydedilemedi');
         } finally {
             setKbSaving(false);
         }
@@ -508,21 +526,32 @@ function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigat
                         {knowledgeDocs.map((doc) => (
                             <div
                                 key={doc.id}
-                                className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 px-4 py-2.5"
+                                className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-2.5 ${
+                                    kbEditingId === doc.id ? 'border-[#663259] bg-[#663259]/5' : 'border-gray-100'
+                                }`}
                             >
                                 <div className="min-w-0">
                                     <p className="text-sm font-bold text-gray-800 truncate">{doc.title}</p>
                                     <p className="text-xs text-gray-400">
                                         {doc.chunkCount} parça · {doc.status === 'INDEXED' ? 'hazır' : doc.status}
+                                        {kbEditingId === doc.id ? ' · düzenleniyor' : ''}
                                     </p>
                                 </div>
-                                <button
-                                    onClick={() => removeKnowledge(doc.id)}
-                                    disabled={kbDeletingId === doc.id}
-                                    className="text-sm text-red-500 hover:text-red-600 font-medium disabled:opacity-40 shrink-0"
-                                >
-                                    {kbDeletingId === doc.id ? 'Siliniyor...' : 'Sil'}
-                                </button>
+                                <div className="flex items-center gap-3 shrink-0">
+                                    <button
+                                        onClick={() => startEditKnowledge(doc)}
+                                        className="text-sm text-[#663259] hover:underline font-medium"
+                                    >
+                                        Düzenle
+                                    </button>
+                                    <button
+                                        onClick={() => removeKnowledge(doc.id)}
+                                        disabled={kbDeletingId === doc.id}
+                                        className="text-sm text-red-500 hover:text-red-600 font-medium disabled:opacity-40"
+                                    >
+                                        {kbDeletingId === doc.id ? 'Siliniyor...' : 'Sil'}
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -547,13 +576,28 @@ function WhatsAppDetailBody({ integration, embedded, onUpdate, onDelete, navigat
                     />
                     <div className="flex items-center justify-between">
                         <span className="text-xs text-gray-400">{kbContent.length}/8000</span>
-                        <button
-                            onClick={addKnowledge}
-                            disabled={kbSaving}
-                            className="px-5 py-2.5 rounded-xl bg-[#663259] text-white font-bold text-sm disabled:opacity-50 hover:shadow-lg hover:shadow-[#663259]/20"
-                        >
-                            {kbSaving ? 'Ekleniyor...' : 'Bilgi Ekle'}
-                        </button>
+                        <div className="flex items-center gap-2">
+                            {kbEditingId && (
+                                <button
+                                    onClick={cancelEditKnowledge}
+                                    disabled={kbSaving}
+                                    className="px-4 py-2.5 rounded-xl bg-gray-100 text-gray-600 font-bold text-sm hover:bg-gray-200 disabled:opacity-50"
+                                >
+                                    Vazgeç
+                                </button>
+                            )}
+                            <button
+                                onClick={saveKnowledge}
+                                disabled={kbSaving}
+                                className="px-5 py-2.5 rounded-xl bg-[#663259] text-white font-bold text-sm disabled:opacity-50 hover:shadow-lg hover:shadow-[#663259]/20"
+                            >
+                                {kbSaving
+                                    ? 'Kaydediliyor...'
+                                    : kbEditingId
+                                      ? 'Güncelle'
+                                      : 'Bilgi Ekle'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </Card>

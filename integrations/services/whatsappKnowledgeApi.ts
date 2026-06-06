@@ -21,6 +21,7 @@ function unwrap<T>(payload: T | ApiEnvelope<T>): T {
 export interface KnowledgeDoc {
     id: string;
     title: string;
+    content: string | null;
     status: string;
     chunkCount: number;
     createdAt: string;
@@ -34,6 +35,15 @@ export const whatsappKnowledgeApi = {
 
     async create(title: string, content: string): Promise<{ documentId: string; chunks: number }> {
         const { data } = await api.post('/integrations/whatsapp/knowledge', { title, content });
+        return unwrap<{ documentId: string; chunks: number }>(data);
+    },
+
+    async update(
+        id: string,
+        title: string,
+        content: string,
+    ): Promise<{ documentId: string; chunks: number }> {
+        const { data } = await api.patch(`/integrations/whatsapp/knowledge/${id}`, { title, content });
         return unwrap<{ documentId: string; chunks: number }>(data);
     },
 
