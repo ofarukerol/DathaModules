@@ -42,20 +42,31 @@ export default function Companies() {
     const [showModal, setShowModal] = useState(false);
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [form, setForm] = useState({ name: '', type: 'CUSTOMER' as CompanyType, phone: '', email: '', city: '' });
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => { fetchCompanies(); }, []);
 
     const handleAdd = async () => {
-        if (!form.name.trim()) return;
-        await addCompany({
-            name: form.name,
-            type: form.type,
-            phone: form.phone || undefined,
-            email: form.email || undefined,
-            city: form.city || undefined,
-        });
-        setShowModal(false);
-        setForm({ name: '', type: 'CUSTOMER', phone: '', email: '', city: '' });
+        if (!form.name.trim() || saving) return;
+        setSaving(true);
+        setError(null);
+        try {
+            await addCompany({
+                name: form.name,
+                type: form.type,
+                phone: form.phone || undefined,
+                email: form.email || undefined,
+                city: form.city || undefined,
+            });
+            setShowModal(false);
+            setForm({ name: '', type: 'CUSTOMER', phone: '', email: '', city: '' });
+        } catch {
+            // Sunucu reddetti veya kayit basarisiz — modal acik kalir, kullanici tekrar dener.
+            setError('Cari kaydedilemedi. Lutfen tekrar deneyin veya oturumunuzu yenileyin.');
+        } finally {
+            setSaving(false);
+        }
     };
 
     const customerCount = companies.filter((c) => c.type === 'CUSTOMER').length;
@@ -74,7 +85,7 @@ export default function Companies() {
                     stats={`${companies.length} firma kayıtlı`}
                     actions={
                         <button
-                            onClick={() => setShowModal(true)}
+                            onClick={() => { setError(null); setShowModal(true); }}
                             className="flex items-center gap-2 px-4 py-2 bg-white text-[#663259] rounded-xl text-sm font-bold transition-all shadow-sm hover:bg-white/90 active:scale-95"
                         >
                             <span className="material-symbols-outlined text-[18px]">add</span>
@@ -178,7 +189,7 @@ export default function Companies() {
                             title="Henüz cari hesap yok"
                             description="Müşteri ve tedarikçi bilgilerinizi buradan yönetebilirsiniz."
                             actionLabel="Yeni Cari Ekle"
-                            onAction={() => setShowModal(true)}
+                            onAction={() => { setError(null); setShowModal(true); }}
                         />
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -267,7 +278,7 @@ export default function Companies() {
                                 <h3 className="text-lg font-bold text-gray-800">Yeni Cari Hesap</h3>
                             </div>
                             <button
-                                onClick={() => setShowModal(false)}
+                                onClick={() => { setShowModal(false); setError(null); }}
                                 className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-full transition-all"
                             >
                                 <span className="material-symbols-outlined text-gray-400 text-[20px]">close</span>
@@ -332,13 +343,19 @@ export default function Companies() {
                                     placeholder="info@firma.com"
                                 />
                             </div>
+                            {error && (
+                                <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-red-50 border border-red-100 text-red-600 text-xs font-medium">
+                                    <span className="material-symbols-outlined text-[16px] shrink-0">error</span>
+                                    <span>{error}</span>
+                                </div>
+                            )}
                             <button
                                 onClick={handleAdd}
-                                disabled={!form.name.trim()}
+                                disabled={!form.name.trim() || saving}
                                 className="w-full py-3 bg-[#663259] text-white rounded-xl text-sm font-bold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
-                                <span className="material-symbols-outlined text-[18px]">check</span>
-                                Kaydet
+                                <span className="material-symbols-outlined text-[18px]">{saving ? 'progress_activity' : 'check'}</span>
+                                {saving ? 'Kaydediliyor...' : 'Kaydet'}
                             </button>
                         </div>
                     </div>

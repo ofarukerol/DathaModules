@@ -3,6 +3,7 @@
 // OFFLINE-FIRST (b): online'sa aninda push; offline/basarisizsa financeOutbox kuyruguna alinir,
 // online olunca otomatik flush edilir. Okuma offline'da son cache'ten doner.
 // BIRIM: backend kurus (int) <-> frontend lira (formatCurrency lira gosterir) → *100 / /100.
+import { isAxiosError } from 'axios';
 import api from '../../_shared/api';
 import { nowISO } from '../../_shared/helpers';
 import type { FinanceEntity, FinanceSyncOp, FinanceSyncOpResult } from '@/types/backend/finance';
@@ -53,8 +54,18 @@ export async function getList<T>(path: string): Promise<T[]> {
 }
 
 /**
- * Tek sync op gonder. Online'sa aninda push (serverId doner); offline/basarisizsa kuyruga alinir
- * (null doner → cagiran localId'yi kullanir). Kuyruk online olunca otomatik gonderilir.
+ * Sunucunun yanit verdigi (4xx/5xx) hata mi? Bu durumda op tekrar denemede de
+ * basarisiz olur (validasyon/yetki/sunucu) → kuyruga ALINMAMALI, hata UI'a gosterilmeli.
+ * Yalniz response'suz hatalar (ag kesintisi, timeout, offline) retry icin kuyruga alinir.
+ */
+function isServerRejection(err: unknown): boolean {
+    return isAxiosError(err) && err.response !== undefined;
+}
+
+/**
+ * Tek sync op gonder. Online'sa aninda push (serverId doner).
+ * - Ag/offline hatasi → kuyruga alinir (null doner; online olunca otomatik gonderilir).
+ * - Sunucu reddi (4xx/5xx) → kuyruga ALINMAZ, hata firlatilir (UI kullaniciya gosterir).
  */
 export async function pushOp(
     entity: FinanceEntity,
@@ -78,7 +89,10 @@ export async function pushOp(
             const res = await api.post('/finance/sync/push', { ops: [syncOp] });
             const result = unwrap<{ results?: FinanceSyncOpResult[] }>(res.data);
             return result?.results?.[0]?.serverId ?? null;
-        } catch {
+        } catch (err) {
+            // Sunucu reddetti (4xx/5xx) → retry anlamsiz; hatayi yukari firlat.
+            if (isServerRejection(err)) throw err;
+            // Ag/offline hatasi → kuyruga al, online olunca yeniden dene.
             enqueueFinanceOp(syncOp);
             return null;
         }
