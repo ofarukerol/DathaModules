@@ -3,6 +3,22 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 const TENANT_ID = import.meta.env.VITE_TENANT_ID || '';
 
+/** Backend token yaniti birden cok bicimde gelebilir (login ile ayni):
+ *  { data: { tokens: { accessToken } } } | { tokens: {...} } | { accessToken } | { data: { accessToken } }.
+ *  Refresh eskiden yalniz duz `data.accessToken` okuyordu → 'tokens' sarmali kacirilinca token undefined
+ *  kaliyor ve oturum bozuluyordu. Bu helper tum bicimleri cozer. */
+interface TokenBody {
+    accessToken?: string;
+    refreshToken?: string;
+    tokens?: { accessToken?: string; refreshToken?: string };
+    data?: TokenBody;
+}
+function extractTokens(body: TokenBody | undefined): { accessToken: string; refreshToken?: string } | null {
+    const at = body?.data?.tokens?.accessToken ?? body?.tokens?.accessToken ?? body?.accessToken ?? body?.data?.accessToken;
+    const rt = body?.data?.tokens?.refreshToken ?? body?.tokens?.refreshToken ?? body?.refreshToken ?? body?.data?.refreshToken;
+    return at ? { accessToken: at, refreshToken: rt } : null;
+}
+
 export const api = axios.create({
     baseURL: API_BASE_URL,
     timeout: 15000,
@@ -80,13 +96,19 @@ api.interceptors.response.use(
                     refreshToken: state.refreshToken,
                 }, { headers: refreshHeaders });
 
+                const tokens = extractTokens(data as TokenBody);
+                if (!tokens) throw new Error('Refresh: token alınamadı');
+                const newAccessToken = tokens.accessToken;
+                // Backend refresh token'i her zaman rotate etmeyebilir → yoksa mevcut refresh'i koru
+                const newRefreshToken = tokens.refreshToken ?? state.refreshToken;
+
                 const parsed = JSON.parse(stored);
-                parsed.state.accessToken = data.accessToken;
-                parsed.state.refreshToken = data.refreshToken;
+                parsed.state.accessToken = newAccessToken;
+                parsed.state.refreshToken = newRefreshToken;
                 localStorage.setItem('datha_auth', JSON.stringify(parsed));
 
-                processQueue(null, data.accessToken);
-                originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
+                processQueue(null, newAccessToken);
+                originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
                 return api(originalRequest);
             } catch (refreshError) {
                 processQueue(refreshError, null);

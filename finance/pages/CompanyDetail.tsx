@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import * as XLSX from 'xlsx';
 import {
     Building2,
     Phone,
@@ -15,30 +16,108 @@ import {
 } from 'lucide-react';
 import DatePicker from '../../../components/DatePicker';
 import { useCompanyStore } from '../../../stores/useCompanyStore';
+import { invoiceService } from '../services/invoiceService';
+import { financeService } from '../services/financeService';
+import { COMPANY_TYPE_LABELS, PAYMENT_METHOD_LABELS, type CompanyType, type PaymentMethod } from '../types';
+import CustomSelect from '../../../components/CustomSelect';
 import PageToolbar from '@/components/PageToolbar';
+
+/** Cari ekstre satiri — alis faturalari + odeme/gider islemleri birlesimi. */
+interface LedgerEntry {
+    id: string;
+    date: string;          // YYYY-MM-DD
+    createdAt?: string;
+    description: string;
+    /** purchase = borc artiran (kirmizi, -), payment = borc azaltan (yesil, +) */
+    kind: 'purchase' | 'payment';
+    kindLabel: string;     // 'Alis Faturasi' | 'Odeme' | 'Satis Faturasi' | 'Gider'
+    amount: number;        // lira, pozitif
+}
+
+// UI odeme yontemi -> backend PaymentMethod enum
+const PAYMENT_METHOD_MAP: Record<'nakit' | 'havale' | 'kredi_karti' | 'cek', PaymentMethod> = {
+    nakit: 'CASH',
+    havale: 'BANK_TRANSFER',
+    kredi_karti: 'CARD',
+    cek: 'CHECK',
+};
+
+const fmtTL = (n: number) => n.toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+
+const escapeHtml = (s: string): string =>
+    s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
 
 const CompanyDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { companies, fetchCompanies, getCompanyById, getTransactionsByCompany, getCompanyBalance, updateCompany, addTransaction } = useCompanyStore();
+    const { companies, fetchCompanies, getCompanyById, updateCompany } = useCompanyStore();
 
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [isEInvoice, setIsEInvoice] = useState(true);
     const [isEArchive, setIsEArchive] = useState(false);
 
+    const [ledger, setLedger] = useState<LedgerEntry[]>([]);
+    const [ledgerLoading, setLedgerLoading] = useState(false);
+
     useEffect(() => { if (companies.length === 0) fetchCompanies(); }, []);
 
     const company = getCompanyById(id || '');
-    const transactions = getTransactionsByCompany(id || '');
-    const balance = getCompanyBalance(id || '');
+
+    /** Gercek backend verisinden ekstre yukle: alis faturalari + cari islemleri. */
+    const loadLedger = useCallback(async () => {
+        if (!id) return;
+        setLedgerLoading(true);
+        try {
+            const [invoices, txns] = await Promise.all([
+                invoiceService.getAll(),
+                financeService.fetchTransactions({ companyId: id }),
+            ]);
+            const entries: LedgerEntry[] = [];
+            for (const inv of invoices) {
+                if (inv.company_id !== id) continue;
+                const isPurchase = inv.direction === 'purchase';
+                const noPart = inv.invoice_no || inv.invoice_number || 'Fatura';
+                entries.push({
+                    id: inv.id,
+                    date: inv.date,
+                    createdAt: inv.created_at,
+                    description: inv.description ? `${noPart} · ${inv.description}` : noPart,
+                    kind: isPurchase ? 'purchase' : 'payment',
+                    kindLabel: isPurchase ? 'Alış Faturası' : 'Satış Faturası',
+                    amount: inv.grand_total,
+                });
+            }
+            for (const t of txns) {
+                const isCredit = t.type === 'INCOME';
+                entries.push({
+                    id: t.id,
+                    date: t.date,
+                    createdAt: t.created_at,
+                    description: t.description || (isCredit ? 'Ödeme' : 'Gider'),
+                    kind: isCredit ? 'payment' : 'purchase',
+                    kindLabel: isCredit ? 'Ödeme' : 'Gider',
+                    amount: t.amount,
+                });
+            }
+            setLedger(entries);
+        } catch {
+            setLedger([]);
+        } finally {
+            setLedgerLoading(false);
+        }
+    }, [id]);
+
+    useEffect(() => { void loadLedger(); }, [loadLedger]);
 
     const [showEditModal, setShowEditModal] = useState(false);
     const [editForm, setEditForm] = useState({
-        name: '', title: '', contact_person: '', phone: '', tax_office: '', tax_number: '', address: '', email: ''
+        name: '', title: '', contact_person: '', phone: '', tax_office: '', tax_number: '', address: '', email: '', type: 'CUSTOMER' as CompanyType
     });
 
     const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [paymentSaving, setPaymentSaving] = useState(false);
+    const [paymentError, setPaymentError] = useState<string | null>(null);
     const [paymentForm, setPaymentForm] = useState({
         amount: '',
         date: new Date().toISOString().split('T')[0],
@@ -46,36 +125,35 @@ const CompanyDetail: React.FC = () => {
         method: 'nakit' as 'nakit' | 'havale' | 'kredi_karti' | 'cek',
     });
 
-    const filteredTransactions = useMemo(() => transactions.filter(t => {
+    const filteredEntries = useMemo(() => ledger.filter(t => {
         if (!startDate && !endDate) return true;
         const d = new Date(t.date);
         const start = startDate ? new Date(startDate) : new Date(0);
         const end = endDate ? new Date(endDate) : new Date(8640000000000000);
         return d >= start && d <= end;
-    }), [transactions, startDate, endDate]);
+    }), [ledger, startDate, endDate]);
 
-    const periodTotals = useMemo(() => filteredTransactions.reduce((acc, t) => {
-        if (t.type === 'purchase') acc.purchase += t.amount;
+    const periodTotals = useMemo(() => filteredEntries.reduce((acc, t) => {
+        if (t.kind === 'purchase') acc.purchase += t.amount;
         else acc.payment += t.amount;
         return acc;
-    }, { purchase: 0, payment: 0 }), [filteredTransactions]);
+    }, { purchase: 0, payment: 0 }), [filteredEntries]);
 
-    const periodBalance = periodTotals.payment - periodTotals.purchase;
+    // Genel cari bakiyesi sunucu-otoriteli (company.balance); ekstre yalniz gosterim.
+    const currentBalance = company?.balance ?? 0;
 
-    // Running balance calculation for table rows
-    const transactionsWithBalance = useMemo(() => {
-        // Sort by date ascending for running balance
-        const sorted = [...filteredTransactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    // Running balance — donem icinde 0'dan baslar (gosterim amacli)
+    const entriesWithBalance = useMemo(() => {
+        const sorted = [...filteredEntries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         let runningBalance = 0;
         const withBalance = sorted.map(t => {
             const before = runningBalance;
-            if (t.type === 'purchase') runningBalance -= t.amount;
+            if (t.kind === 'purchase') runningBalance -= t.amount;
             else runningBalance += t.amount;
             return { ...t, balanceBefore: before, balanceAfter: runningBalance };
         });
-        // Reverse to show newest first
         return withBalance.reverse();
-    }, [filteredTransactions]);
+    }, [filteredEntries]);
 
     if (!company) {
         return (
@@ -95,6 +173,7 @@ const CompanyDetail: React.FC = () => {
             tax_number: company.tax_number || '',
             address: company.address || '',
             email: company.email || '',
+            type: company.type,
         });
         setShowEditModal(true);
     };
@@ -104,19 +183,102 @@ const CompanyDetail: React.FC = () => {
         setShowEditModal(false);
     };
 
-    const handlePaymentSave = () => {
-        if (!paymentForm.amount || Number(paymentForm.amount) <= 0) return;
-        addTransaction({
-            companyId: company.id,
-            date: paymentForm.date,
-            description: paymentForm.description || 'Ödeme',
-            type: 'payment',
-            amount: Number(paymentForm.amount),
-            method: paymentForm.method,
-            status: 'completed',
-        });
-        setShowPaymentModal(false);
+    const openPaymentModal = () => {
+        setPaymentError(null);
         setPaymentForm({ amount: '', date: new Date().toISOString().split('T')[0], description: '', method: 'nakit' });
+        setShowPaymentModal(true);
+    };
+
+    const handlePaymentSave = async () => {
+        if (paymentSaving) return;
+        if (!paymentForm.amount || Number(paymentForm.amount) <= 0) {
+            setPaymentError('Geçerli bir tutar girin.');
+            return;
+        }
+        setPaymentSaving(true);
+        setPaymentError(null);
+        try {
+            // Cari odeme = borcu azaltir → INCOME islemi (recomputeCompanyBalance: INCOME bakiyeyi artirir).
+            await financeService.createTransaction({
+                company_id: company.id,
+                type: 'INCOME',
+                amount: Number(paymentForm.amount),
+                date: paymentForm.date,
+                description: paymentForm.description || 'Ödeme',
+                payment_method: PAYMENT_METHOD_MAP[paymentForm.method],
+            });
+            setShowPaymentModal(false);
+            await Promise.all([fetchCompanies(), loadLedger()]);
+        } catch {
+            setPaymentError('Ödeme kaydedilemedi. Lütfen tekrar deneyin veya oturumunuzu yenileyin.');
+        } finally {
+            setPaymentSaving(false);
+        }
+    };
+
+    const handleExportExcel = () => {
+        const rows = entriesWithBalance.map(e => ({
+            'Tarih': e.date,
+            'İşlem': e.description,
+            'Tür': e.kindLabel,
+            'Tutar (₺)': e.kind === 'purchase' ? -e.amount : e.amount,
+            'Bakiye (₺)': e.balanceAfter,
+        }));
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Ekstre');
+        XLSX.writeFile(wb, `${company.name.replace(/[^\p{L}\p{N}_-]+/gu, '_')}-ekstre.xlsx`);
+    };
+
+    const handleExportPdf = () => {
+        const rowsHtml = entriesWithBalance.map(e => `
+            <tr>
+                <td>${escapeHtml(e.date)}</td>
+                <td>${escapeHtml(e.description)}</td>
+                <td>${escapeHtml(e.kindLabel)}</td>
+                <td class="num">${e.kind === 'purchase' ? '-' : '+'} ${escapeHtml(fmtTL(e.amount))} ₺</td>
+                <td class="num">${escapeHtml(fmtTL(e.balanceAfter))} ₺</td>
+            </tr>`).join('');
+        const html = `<!doctype html><html lang="tr"><head><meta charset="utf-8">
+            <title>${escapeHtml(company.name)} - Cari Ekstre</title>
+            <style>
+                * { font-family: Arial, sans-serif; }
+                body { padding: 24px; color: #1f2937; }
+                h1 { font-size: 18px; margin: 0 0 4px; }
+                .sub { color: #6b7280; font-size: 12px; margin: 0 0 16px; }
+                table { width: 100%; border-collapse: collapse; font-size: 12px; }
+                th, td { padding: 8px 10px; border-bottom: 1px solid #e5e7eb; text-align: left; }
+                th { background: #f3f4f6; text-transform: uppercase; font-size: 10px; letter-spacing: .05em; }
+                .num { text-align: right; white-space: nowrap; }
+                .totals { margin-top: 16px; font-size: 13px; }
+                .totals span { margin-right: 24px; }
+            </style></head><body>
+            <h1>${escapeHtml(company.name)}</h1>
+            <p class="sub">${escapeHtml(company.title || '')} · Cari Ekstre${startDate || endDate ? ` (${escapeHtml(startDate || '...')} – ${escapeHtml(endDate || '...')})` : ''}</p>
+            <table><thead><tr>
+                <th>Tarih</th><th>İşlem</th><th>Tür</th><th class="num">Tutar</th><th class="num">Bakiye</th>
+            </tr></thead><tbody>${rowsHtml || '<tr><td colspan="5">Kayıt bulunamadı.</td></tr>'}</tbody></table>
+            <div class="totals">
+                <span>Toplam Alım: <b>${escapeHtml(fmtTL(periodTotals.purchase))} ₺</b></span>
+                <span>Toplam Ödeme: <b>${escapeHtml(fmtTL(periodTotals.payment))} ₺</b></span>
+                <span>Güncel Bakiye: <b>${escapeHtml(fmtTL(currentBalance))} ₺</b></span>
+            </div></body></html>`;
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        iframe.srcdoc = html;
+        iframe.onload = () => {
+            const win = iframe.contentWindow;
+            if (!win) { iframe.remove(); return; }
+            win.onafterprint = () => iframe.remove();
+            win.focus();
+            win.print();
+        };
+        document.body.appendChild(iframe);
     };
 
     return (
@@ -130,15 +292,15 @@ const CompanyDetail: React.FC = () => {
                     actions={
                         <div className="flex items-center gap-2.5">
                             <button
-                                onClick={() => setShowPaymentModal(true)}
-                                className="flex items-center gap-2 px-4 py-2 bg-white/10 border border-white/15 text-white rounded-xl text-sm font-semibold transition-all hover:bg-white/20 active:scale-95"
+                                onClick={openPaymentModal}
+                                className="flex items-center gap-2 px-4 py-2 bg-[#10B981] text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:bg-[#059669] active:scale-95"
                             >
                                 <CreditCard size={16} />
                                 Ödeme Ekle
                             </button>
                             <button
-                                onClick={() => navigate(`/finance/companies/${id}/invoice/new`)}
-                                className="flex items-center gap-2 px-4 py-2 bg-white text-[#663259] rounded-xl text-sm font-bold transition-all shadow-sm hover:bg-white/90 active:scale-95"
+                                onClick={() => navigate(`/finance/companies/${id}/invoice/new?direction=purchase`)}
+                                className="flex items-center gap-2 px-4 py-2 bg-[#663259] text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:bg-[#4a2340] active:scale-95"
                             >
                                 <Plus size={16} />
                                 Alış Faturası Ekle
@@ -229,15 +391,15 @@ const CompanyDetail: React.FC = () => {
                                 <p className="text-sm font-black text-green-600">₺{periodTotals.payment.toLocaleString('tr-TR')}</p>
                             </div>
 
-                            {/* Dönem Bakiyesi */}
-                            <div className={`p-3 rounded-xl border ${periodBalance < 0 ? 'bg-[#663259]/5 border-[#663259]/10' : 'bg-green-50/60 border-green-100/50'}`}>
-                                <p className="text-[8px] text-gray-400 font-black uppercase tracking-widest mb-1.5">Dönem Bakiyesi</p>
+                            {/* Guncel Bakiye (sunucu-otoriteli) */}
+                            <div className={`p-3 rounded-xl border ${currentBalance < 0 ? 'bg-[#663259]/5 border-[#663259]/10' : 'bg-green-50/60 border-green-100/50'}`}>
+                                <p className="text-[8px] text-gray-400 font-black uppercase tracking-widest mb-1.5">Güncel Bakiye</p>
                                 <div className="flex items-end justify-between">
-                                    <p className={`text-xl font-black tracking-tight ${periodBalance < 0 ? 'text-[#663259]' : 'text-green-600'}`}>
-                                        {periodBalance.toLocaleString('tr-TR')}₺
+                                    <p className={`text-xl font-black tracking-tight ${currentBalance < 0 ? 'text-[#663259]' : 'text-green-600'}`}>
+                                        {currentBalance.toLocaleString('tr-TR')}₺
                                     </p>
-                                    <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${periodBalance < 0 ? 'bg-red-100 text-red-500' : 'bg-green-100 text-green-500'}`}>
-                                        {periodBalance < 0 ? 'Borçlu' : 'Alacaklı'}
+                                    <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${currentBalance < 0 ? 'bg-red-100 text-red-500' : 'bg-green-100 text-green-500'}`}>
+                                        {currentBalance < 0 ? 'Borçlu' : 'Alacaklı'}
                                     </span>
                                 </div>
                             </div>
@@ -312,11 +474,19 @@ const CompanyDetail: React.FC = () => {
                         </div>
 
                         <div className="flex items-center gap-1.5">
-                            <button className="flex items-center gap-1.5 px-3 py-2 bg-gray-50 hover:bg-gray-100 text-gray-500 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border border-gray-100">
+                            <button
+                                onClick={handleExportPdf}
+                                disabled={entriesWithBalance.length === 0}
+                                className="flex items-center gap-1.5 px-3 py-2 bg-gray-50 hover:bg-gray-100 text-gray-500 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border border-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
                                 <Download size={14} />
                                 PDF
                             </button>
-                            <button className="flex items-center gap-1.5 px-3 py-2 bg-gray-50 hover:bg-gray-100 text-gray-500 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border border-gray-100">
+                            <button
+                                onClick={handleExportExcel}
+                                disabled={entriesWithBalance.length === 0}
+                                className="flex items-center gap-1.5 px-3 py-2 bg-gray-50 hover:bg-gray-100 text-gray-500 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border border-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
                                 <Download size={14} />
                                 EXCEL
                             </button>
@@ -335,8 +505,8 @@ const CompanyDetail: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
-                                {transactionsWithBalance.map(t => (
-                                    <tr key={t.id} className="hover:bg-[#663259]/[0.02] transition-colors group cursor-pointer">
+                                {entriesWithBalance.map(t => (
+                                    <tr key={t.id} className="hover:bg-[#663259]/[0.02] transition-colors group">
                                         <td className="px-8 py-5">
                                             <div className="flex flex-col">
                                                 <span className="text-sm font-bold text-gray-700">{t.date}</span>
@@ -347,22 +517,22 @@ const CompanyDetail: React.FC = () => {
                                         </td>
                                         <td className="px-8 py-5">
                                             <div className="flex items-center gap-3">
-                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${t.type === 'purchase' ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-500'}`}>
+                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${t.kind === 'purchase' ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-500'}`}>
                                                     <span className="material-symbols-outlined text-[18px]">
-                                                        {t.type === 'purchase' ? 'shopping_cart' : 'payments'}
+                                                        {t.kind === 'purchase' ? 'shopping_cart' : 'payments'}
                                                     </span>
                                                 </div>
                                                 <span className="text-sm font-bold text-gray-600 group-hover:text-[#663259] transition-colors">{t.description}</span>
                                             </div>
                                         </td>
                                         <td className="px-8 py-5">
-                                            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${t.type === 'purchase' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-                                                {t.type === 'purchase' ? 'Alış Faturası' : 'Ödeme'}
+                                            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${t.kind === 'purchase' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                                                {t.kindLabel}
                                             </span>
                                         </td>
                                         <td className="px-8 py-5 text-right">
-                                            <span className={`text-base font-black ${t.type === 'purchase' ? 'text-red-500' : 'text-green-500'}`}>
-                                                {t.type === 'purchase' ? '-' : '+'} ₺{t.amount.toLocaleString('tr-TR')}
+                                            <span className={`text-base font-black ${t.kind === 'purchase' ? 'text-red-500' : 'text-green-500'}`}>
+                                                {t.kind === 'purchase' ? '-' : '+'} ₺{t.amount.toLocaleString('tr-TR')}
                                             </span>
                                         </td>
                                         <td className="px-8 py-5 text-right">
@@ -373,11 +543,20 @@ const CompanyDetail: React.FC = () => {
                             </tbody>
                         </table>
 
-                        {filteredTransactions.length === 0 && (
+                        {!ledgerLoading && filteredEntries.length === 0 && (
                             <div className="flex flex-col items-center justify-center py-32 text-gray-400">
                                 <History size={64} className="opacity-10 mb-4" />
                                 <p className="text-lg font-bold">Kayıt Bulunamadı</p>
                                 <p className="text-sm">Seçilen tarih aralığında işlem bulunmamaktadır.</p>
+                            </div>
+                        )}
+
+                        {ledgerLoading && (
+                            <div className="flex items-center justify-center py-32 text-gray-400">
+                                <svg className="animate-spin h-7 w-7 text-[#663259]" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
                             </div>
                         )}
                     </div>
@@ -395,9 +574,9 @@ const CompanyDetail: React.FC = () => {
                             </div>
                         </div>
                         <div className="text-right">
-                            <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest mr-4">Dönem Sonu Net</span>
-                            <span className={`text-xl font-black ${periodBalance < 0 ? 'text-red-500' : 'text-green-500'}`}>
-                                ₺{periodBalance.toLocaleString('tr-TR')}
+                            <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest mr-4">Güncel Net Bakiye</span>
+                            <span className={`text-xl font-black ${currentBalance < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                ₺{currentBalance.toLocaleString('tr-TR')}
                             </span>
                         </div>
                     </div>
@@ -502,6 +681,21 @@ const CompanyDetail: React.FC = () => {
                             </div>
 
                             <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Cari Türü</label>
+                                <CustomSelect
+                                    options={[
+                                        { value: 'CUSTOMER', label: COMPANY_TYPE_LABELS.CUSTOMER, icon: 'person' },
+                                        { value: 'SUPPLIER', label: COMPANY_TYPE_LABELS.SUPPLIER, icon: 'local_shipping' },
+                                        { value: 'BOTH', label: COMPANY_TYPE_LABELS.BOTH, icon: 'sync_alt' },
+                                    ]}
+                                    value={editForm.type}
+                                    onChange={(v) => setEditForm({ ...editForm, type: v as CompanyType })}
+                                    icon="category"
+                                    accentColor="#663259"
+                                />
+                            </div>
+
+                            <div className="space-y-1.5">
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Fatura Türü</label>
                                 <div className="flex items-center gap-6 p-4 bg-gray-50 border border-gray-100 rounded-2xl">
                                     <label className="flex items-center gap-2.5 cursor-pointer group">
@@ -595,10 +789,10 @@ const CompanyDetail: React.FC = () => {
                                         onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value as typeof paymentForm.method })}
                                         className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#10B981]/20 transition-all appearance-none cursor-pointer"
                                     >
-                                        <option value="nakit">Nakit</option>
-                                        <option value="havale">Havale / EFT</option>
-                                        <option value="kredi_karti">Kredi Kartı</option>
-                                        <option value="cek">Çek</option>
+                                        <option value="nakit">{PAYMENT_METHOD_LABELS.CASH}</option>
+                                        <option value="havale">{PAYMENT_METHOD_LABELS.BANK_TRANSFER}</option>
+                                        <option value="kredi_karti">{PAYMENT_METHOD_LABELS.CARD}</option>
+                                        <option value="cek">{PAYMENT_METHOD_LABELS.CHECK}</option>
                                     </select>
                                 </div>
                             </div>
@@ -618,21 +812,28 @@ const CompanyDetail: React.FC = () => {
                                     <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-100 space-y-2">
                                         <div className="flex items-center justify-between">
                                             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Mevcut</span>
-                                            <span className={`text-sm font-black ${balance.balance < 0 ? 'text-red-500' : 'text-green-500'}`}>
-                                                ₺{balance.balance.toLocaleString('tr-TR')}
+                                            <span className={`text-sm font-black ${currentBalance < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                                ₺{currentBalance.toLocaleString('tr-TR')}
                                             </span>
                                         </div>
                                         {paymentForm.amount && (
                                             <div className="flex items-center justify-between pt-2 border-t border-gray-200">
                                                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Sonrası</span>
-                                                <span className={`text-sm font-black ${(balance.balance + Number(paymentForm.amount)) < 0 ? 'text-red-500' : 'text-green-500'}`}>
-                                                    ₺{(balance.balance + Number(paymentForm.amount)).toLocaleString('tr-TR')}
+                                                <span className={`text-sm font-black ${(currentBalance + Number(paymentForm.amount)) < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                                    ₺{(currentBalance + Number(paymentForm.amount)).toLocaleString('tr-TR')}
                                                 </span>
                                             </div>
                                         )}
                                     </div>
                                 </div>
                             </div>
+
+                            {paymentError && (
+                                <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-red-50 border border-red-100 text-red-600 text-xs font-medium">
+                                    <span className="material-symbols-outlined text-[16px] shrink-0">error</span>
+                                    <span>{paymentError}</span>
+                                </div>
+                            )}
                         </div>
 
                         <div className="px-8 py-5 bg-gray-50/50 border-t border-gray-100 flex gap-3">
@@ -644,9 +845,10 @@ const CompanyDetail: React.FC = () => {
                             </button>
                             <button
                                 onClick={handlePaymentSave}
-                                className="flex-1 px-6 py-3.5 bg-[#10B981] text-white rounded-2xl hover:bg-[#059669] transition-all font-black text-xs uppercase tracking-widest shadow-lg shadow-[#10B981]/20"
+                                disabled={paymentSaving}
+                                className="flex-1 px-6 py-3.5 bg-[#10B981] text-white rounded-2xl hover:bg-[#059669] transition-all font-black text-xs uppercase tracking-widest shadow-lg shadow-[#10B981]/20 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                Ödemeyi Kaydet
+                                {paymentSaving ? 'Kaydediliyor...' : 'Ödemeyi Kaydet'}
                             </button>
                         </div>
                     </div>
