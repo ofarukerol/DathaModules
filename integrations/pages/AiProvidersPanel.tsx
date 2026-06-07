@@ -27,6 +27,13 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
     );
     const [saving, setSaving] = useState(false);
     const [testingProvider, setTestingProvider] = useState<AiProviderKey | null>(null);
+    // Göz ile gösterme: hangi sağlayıcının anahtarı açık + çözülmüş açık metin önbelleği.
+    const [showKey, setShowKey] = useState<Record<AiProviderKey, boolean>>(
+        () => buildProviderRecord(() => false),
+    );
+    const [revealedKeys, setRevealedKeys] = useState<Record<AiProviderKey, string>>(
+        () => buildProviderRecord(() => ''),
+    );
 
     useEffect(() => {
         let cancelled = false;
@@ -81,6 +88,9 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
                 return next;
             });
             setAiNewKeys(buildProviderRecord(() => ''));
+            // Açık metin önbelleğini sıfırla (eski/yeni anahtar karışmasın).
+            setRevealedKeys(buildProviderRecord(() => ''));
+            setShowKey(buildProviderRecord(() => false));
             addToast('success', 'Yapay zeka anahtarları kaydedildi');
         } catch (err) {
             addToast('error', err instanceof Error ? err.message : 'Kaydedilemedi');
@@ -89,11 +99,57 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
         }
     };
 
+    /** Göz ikonu: anahtarı aç/gizle. Kayıtlı (eklenmiş) anahtar için açık metni backend'den çeker. */
+    const toggleReveal = async (provider: AiProviderKey) => {
+        if (showKey[provider]) {
+            setShowKey((prev) => ({ ...prev, [provider]: false }));
+            return;
+        }
+        // Yazılmış yeni anahtar yoksa ama kayıtlı anahtar varsa açık metni getir.
+        if (!aiNewKeys[provider].trim() && aiMasked[provider] && !revealedKeys[provider]) {
+            try {
+                const key = await aiKeysApi.reveal(provider);
+                setRevealedKeys((prev) => ({ ...prev, [provider]: key }));
+            } catch {
+                addToast('error', 'Anahtar gösterilemedi (sunucu güncellemesi gerekebilir).');
+                return;
+            }
+        }
+        setShowKey((prev) => ({ ...prev, [provider]: true }));
+    };
+
     const testAiProvider = async (provider: AiProviderKey) => {
+        const meta = AI_PROVIDERS.find((p) => p.key === provider);
+        const typedKey = aiNewKeys[provider].trim();
+        const hasSavedKey = !!aiMasked[provider];
+        if (!typedKey && !hasSavedKey) {
+            addToast('error', 'Test etmek için önce API anahtarı girin.');
+            return;
+        }
         setTestingProvider(provider);
         try {
+            // Test, kayıtlı anahtarı doğrular. Bu yüzden girilen anahtar/model önce
+            // kaydedilir (eklendiğinden emin olunur), ardından test edilir.
+            await aiKeysApi.upsert(provider, {
+                apiKey: typedKey || undefined,
+                modelName: aiModels[provider].trim() || meta?.defaultModel || '',
+            });
             const res = await aiKeysApi.test(provider);
             addToast(res.success ? 'success' : 'error', res.message);
+            // Kaydedilen anahtarı maskeli göster ve input'u temizle.
+            const fresh = await aiKeysApi.list();
+            setAiMasked((prev) => {
+                const next = { ...prev };
+                fresh.forEach((k) => {
+                    if (isAiProviderKey(k.provider)) next[k.provider] = k.apiKeyMasked;
+                });
+                return next;
+            });
+            if (typedKey) {
+                setAiNewKeys((prev) => ({ ...prev, [provider]: '' }));
+                setRevealedKeys((prev) => ({ ...prev, [provider]: '' }));
+                setShowKey((prev) => ({ ...prev, [provider]: false }));
+            }
         } catch (err) {
             addToast('error', err instanceof Error ? err.message : 'Test başarısız');
         } finally {
@@ -145,13 +201,26 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
                                 <span className="text-xs text-gray-400 font-mono">{aiMasked[p.key]}</span>
                             )}
                         </div>
-                        <input
-                            type="password"
-                            value={aiNewKeys[p.key]}
-                            onChange={(e) => setAiNewKeys((prev) => ({ ...prev, [p.key]: e.target.value }))}
-                            placeholder={aiMasked[p.key] ? 'Yeni anahtar (değiştirmek için)' : p.keyPlaceholder}
-                            className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-mono focus:border-[#663259] focus:ring-1 focus:ring-[#663259] outline-none mb-2"
-                        />
+                        <div className="relative mb-2">
+                            <input
+                                type={showKey[p.key] ? 'text' : 'password'}
+                                value={aiNewKeys[p.key] || (showKey[p.key] ? revealedKeys[p.key] : '')}
+                                onChange={(e) => setAiNewKeys((prev) => ({ ...prev, [p.key]: e.target.value }))}
+                                placeholder={aiMasked[p.key] ? 'Yeni anahtar (değiştirmek için)' : p.keyPlaceholder}
+                                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 pr-11 text-sm font-mono focus:border-[#663259] focus:ring-1 focus:ring-[#663259] outline-none"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => toggleReveal(p.key)}
+                                disabled={!aiNewKeys[p.key].trim() && !aiMasked[p.key]}
+                                title={showKey[p.key] ? 'Anahtarı gizle' : 'Anahtarı göster'}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-gray-400 hover:text-[#663259] hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                            >
+                                <span className="material-symbols-outlined text-[18px]">
+                                    {showKey[p.key] ? 'visibility_off' : 'visibility'}
+                                </span>
+                            </button>
+                        </div>
                         <a
                             href={p.apiKeyUrl}
                             target="_blank"
@@ -171,8 +240,12 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
                             />
                             <button
                                 onClick={() => testAiProvider(p.key)}
-                                disabled={testingProvider === p.key || !aiMasked[p.key]}
-                                title={!aiMasked[p.key] ? 'Önce anahtarı kaydedin, sonra test edin' : 'Kayıtlı anahtarı test et'}
+                                disabled={testingProvider === p.key || (!aiNewKeys[p.key].trim() && !aiMasked[p.key])}
+                                title={
+                                    !aiNewKeys[p.key].trim() && !aiMasked[p.key]
+                                        ? 'Test etmek için API anahtarı girin'
+                                        : 'Anahtarı kaydeder ve test eder'
+                                }
                                 className="px-4 py-2 rounded-xl bg-gray-100 text-gray-700 text-sm font-bold hover:bg-gray-200 disabled:opacity-40 transition-colors whitespace-nowrap"
                             >
                                 {testingProvider === p.key ? 'Test...' : 'Test Et'}

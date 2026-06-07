@@ -60,6 +60,12 @@ export const aiKeysApi = {
         const { data } = await api.post(`/integrations/ai-keys/${provider}/test`);
         return unwrap<AiKeyTestResult>(data);
     },
+
+    /** Kayıtlı anahtarı açık metin olarak getirir (kullanıcı "göster" ile talep eder). */
+    async reveal(provider: AiProviderKey): Promise<string> {
+        const { data } = await api.get(`/integrations/ai-keys/${provider}/reveal`);
+        return unwrap<{ provider: AiProviderKey; apiKey: string }>(data).apiKey;
+    },
 };
 
 export default aiKeysApi;
