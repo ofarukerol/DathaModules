@@ -4,9 +4,29 @@
 // Tanımlamalar > Yapay Zeka sekmesinde render edilir; başka sayfalardan da kullanılabilir.
 
 import { useEffect, useState } from 'react';
+import axios from 'axios';
 import { aiKeysApi, type AiProviderKey } from '../services/aiKeysApi';
 import { AI_PROVIDERS, isAiProviderKey, buildProviderRecord } from '../config/aiProviders';
 import { useToastStore } from '../../../stores/useToastStore';
+import CustomSelect from '@/components/CustomSelect';
+
+/** Axios hatasından backend'in gerçek mesajını çıkarır (ham "Request failed..." yerine). */
+function backendErrorMessage(err: unknown, fallback: string): string {
+    if (axios.isAxiosError(err)) {
+        const data: unknown = err.response?.data;
+        if (data && typeof data === 'object') {
+            const record: Record<string, unknown> = data as Record<string, unknown>;
+            const errorField = record.error;
+            if (errorField && typeof errorField === 'object') {
+                const msg = (errorField as Record<string, unknown>).message;
+                if (typeof msg === 'string') return msg;
+            }
+            if (typeof record.message === 'string') return record.message;
+        }
+        return err.message;
+    }
+    return err instanceof Error ? err.message : fallback;
+}
 
 interface AiProvidersPanelProps {
     /** Ayarlar paneli içinde gömülü mü (absolute layout) */
@@ -79,21 +99,26 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
                     modelName: aiModels[p.key].trim() || p.defaultModel,
                 });
             }
-            const fresh = await aiKeysApi.list();
-            setAiMasked((prev) => {
-                const next = { ...prev };
-                fresh.forEach((k) => {
-                    if (isAiProviderKey(k.provider)) next[k.provider] = k.apiKeyMasked;
-                });
-                return next;
-            });
             setAiNewKeys(buildProviderRecord(() => ''));
             // Açık metin önbelleğini sıfırla (eski/yeni anahtar karışmasın).
             setRevealedKeys(buildProviderRecord(() => ''));
             setShowKey(buildProviderRecord(() => false));
             addToast('success', 'Yapay zeka anahtarları kaydedildi');
+            // Maske tazeleme best-effort — başarısız olsa bile kaydetmeyi etkilemesin.
+            try {
+                const fresh = await aiKeysApi.list();
+                setAiMasked((prev) => {
+                    const next = { ...prev };
+                    fresh.forEach((k) => {
+                        if (isAiProviderKey(k.provider)) next[k.provider] = k.apiKeyMasked;
+                    });
+                    return next;
+                });
+            } catch {
+                /* maske tazelenemedi — kritik değil */
+            }
         } catch (err) {
-            addToast('error', err instanceof Error ? err.message : 'Kaydedilemedi');
+            addToast('error', backendErrorMessage(err, 'Kaydedilemedi'));
         } finally {
             setSaving(false);
         }
@@ -110,8 +135,8 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
             try {
                 const key = await aiKeysApi.reveal(provider);
                 setRevealedKeys((prev) => ({ ...prev, [provider]: key }));
-            } catch {
-                addToast('error', 'Anahtar gösterilemedi (sunucu güncellemesi gerekebilir).');
+            } catch (err) {
+                addToast('error', backendErrorMessage(err, 'Anahtar gösterilemedi'));
                 return;
             }
         }
@@ -136,22 +161,26 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
             });
             const res = await aiKeysApi.test(provider);
             addToast(res.success ? 'success' : 'error', res.message);
-            // Kaydedilen anahtarı maskeli göster ve input'u temizle.
-            const fresh = await aiKeysApi.list();
-            setAiMasked((prev) => {
-                const next = { ...prev };
-                fresh.forEach((k) => {
-                    if (isAiProviderKey(k.provider)) next[k.provider] = k.apiKeyMasked;
+            // Maske tazeleme best-effort — başarısız olsa bile test sonucunu etkilemesin.
+            try {
+                const fresh = await aiKeysApi.list();
+                setAiMasked((prev) => {
+                    const next = { ...prev };
+                    fresh.forEach((k) => {
+                        if (isAiProviderKey(k.provider)) next[k.provider] = k.apiKeyMasked;
+                    });
+                    return next;
                 });
-                return next;
-            });
-            if (typedKey) {
-                setAiNewKeys((prev) => ({ ...prev, [provider]: '' }));
-                setRevealedKeys((prev) => ({ ...prev, [provider]: '' }));
-                setShowKey((prev) => ({ ...prev, [provider]: false }));
+                if (typedKey) {
+                    setAiNewKeys((prev) => ({ ...prev, [provider]: '' }));
+                    setRevealedKeys((prev) => ({ ...prev, [provider]: '' }));
+                    setShowKey((prev) => ({ ...prev, [provider]: false }));
+                }
+            } catch {
+                /* maske tazelenemedi — kritik değil */
             }
         } catch (err) {
-            addToast('error', err instanceof Error ? err.message : 'Test başarısız');
+            addToast('error', backendErrorMessage(err, 'Test başarısız'));
         } finally {
             setTestingProvider(null);
         }
@@ -231,13 +260,20 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
                             API anahtarını buradan al
                         </a>
                         <div className="flex items-center gap-2">
-                            <input
-                                type="text"
-                                value={aiModels[p.key]}
-                                onChange={(e) => setAiModels((prev) => ({ ...prev, [p.key]: e.target.value }))}
-                                placeholder={p.defaultModel}
-                                className="flex-1 rounded-xl border border-gray-200 px-4 py-2 text-sm focus:border-[#663259] focus:ring-1 focus:ring-[#663259] outline-none"
-                            />
+                            <div className="flex-1">
+                                <CustomSelect
+                                    combobox
+                                    allowCustomValue
+                                    options={[
+                                        ...new Set([aiModels[p.key], ...p.models].filter(Boolean)),
+                                    ].map((m) => ({ value: m, label: m }))}
+                                    value={aiModels[p.key]}
+                                    onChange={(v) => setAiModels((prev) => ({ ...prev, [p.key]: v }))}
+                                    placeholder={p.defaultModel}
+                                    searchPlaceholder="Model ara veya yaz..."
+                                    accentColor="#663259"
+                                />
+                            </div>
                             <button
                                 onClick={() => testAiProvider(p.key)}
                                 disabled={testingProvider === p.key || (!aiNewKeys[p.key].trim() && !aiMasked[p.key])}

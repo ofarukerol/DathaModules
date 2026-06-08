@@ -19,6 +19,8 @@ export interface AiProviderMeta {
     keyPlaceholder: string;
     /** Model adı input'unun varsayılanı ve placeholder'ı. */
     defaultModel: string;
+    /** Sağlayıcının seçilebilir güncel modelleri (CustomSelect; serbest giriş de açık). */
+    models: string[];
     /** Kullanıcının API anahtarını alabileceği sayfa. */
     apiKeyUrl: string;
 }
@@ -30,6 +32,7 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
         icon: 'smart_toy',
         keyPlaceholder: 'sk-...',
         defaultModel: 'gpt-4o-mini',
+        models: ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1', 'gpt-4.1-mini', 'o3-mini'],
         apiKeyUrl: 'https://platform.openai.com/api-keys',
     },
     {
@@ -37,7 +40,8 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
         label: 'Google (Gemini)',
         icon: 'auto_awesome',
         keyPlaceholder: 'AIza...',
-        defaultModel: 'gemini-1.5-flash',
+        defaultModel: 'gemini-2.5-flash',
+        models: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'],
         apiKeyUrl: 'https://aistudio.google.com/app/apikey',
     },
     {
@@ -46,6 +50,7 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
         icon: 'neurology',
         keyPlaceholder: 'sk-...',
         defaultModel: 'deepseek-chat',
+        models: ['deepseek-chat', 'deepseek-reasoner'],
         apiKeyUrl: 'https://platform.deepseek.com/api_keys',
     },
     {
@@ -53,7 +58,8 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
         label: 'MiniMax',
         icon: 'blur_on',
         keyPlaceholder: 'API anahtarı',
-        defaultModel: 'abab6.5s-chat',
+        defaultModel: 'MiniMax-Text-01',
+        models: ['MiniMax-Text-01', 'abab6.5s-chat', 'abab6.5-chat'],
         apiKeyUrl: 'https://platform.minimaxi.com/user-center/basic-information/interface-key',
     },
     {
@@ -61,7 +67,8 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
         label: 'xAI (Grok)',
         icon: 'rocket_launch',
         keyPlaceholder: 'xai-...',
-        defaultModel: 'grok-2-latest',
+        defaultModel: 'grok-3',
+        models: ['grok-3', 'grok-3-mini', 'grok-2-latest', 'grok-2-vision-1212'],
         apiKeyUrl: 'https://console.x.ai',
     },
 ];
