@@ -217,78 +217,116 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
                     kendi ayarından seçilir.
                 </p>
 
-                {AI_PROVIDERS.map((p) => (
-                    <div key={p.key} className="rounded-xl border border-gray-100 p-4 mb-3">
-                        <div className="flex items-center justify-between mb-3">
-                            <span className="font-bold text-sm text-gray-800 flex items-center gap-1.5">
-                                <span className="material-symbols-outlined text-[18px] text-[#663259]">
-                                    {p.icon}
-                                </span>
-                                {p.label}
-                            </span>
-                            {aiMasked[p.key] && (
-                                <span className="text-xs text-gray-400 font-mono">{aiMasked[p.key]}</span>
-                            )}
-                        </div>
-                        <div className="relative mb-2">
-                            <input
-                                type={showKey[p.key] ? 'text' : 'password'}
-                                value={aiNewKeys[p.key] || (showKey[p.key] ? revealedKeys[p.key] : '')}
-                                onChange={(e) => setAiNewKeys((prev) => ({ ...prev, [p.key]: e.target.value }))}
-                                placeholder={aiMasked[p.key] ? 'Yeni anahtar (değiştirmek için)' : p.keyPlaceholder}
-                                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 pr-11 text-sm font-mono focus:border-[#663259] focus:ring-1 focus:ring-[#663259] outline-none"
-                            />
-                            <button
-                                type="button"
-                                onClick={() => toggleReveal(p.key)}
-                                disabled={!aiNewKeys[p.key].trim() && !aiMasked[p.key]}
-                                title={showKey[p.key] ? 'Anahtarı gizle' : 'Anahtarı göster'}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-gray-400 hover:text-[#663259] hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                            >
-                                <span className="material-symbols-outlined text-[18px]">
-                                    {showKey[p.key] ? 'visibility_off' : 'visibility'}
-                                </span>
-                            </button>
-                        </div>
-                        <a
-                            href={p.apiKeyUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-xs text-[#663259] hover:underline mb-2"
+                {AI_PROVIDERS.map((p) => {
+                    const connected = !!aiMasked[p.key];
+                    const canUse = !!aiNewKeys[p.key].trim() || connected;
+                    // Yalnizca guncel modeller listelenir (elle giris yok). Kayitli model
+                    // listede yoksa CustomSelect placeholder gosterir -> kullanici guncel birini secer.
+                    const modelOptions = p.models.map((m) => ({ value: m, label: m }));
+                    return (
+                        <div
+                            key={p.key}
+                            className="rounded-2xl border border-gray-200 bg-white p-5 mb-4 shadow-sm transition-shadow hover:shadow-md"
                         >
-                            <span className="material-symbols-outlined text-[14px]">open_in_new</span>
-                            API anahtarını buradan al
-                        </a>
-                        <div className="flex items-center gap-2">
-                            <div className="flex-1">
-                                <CustomSelect
-                                    combobox
-                                    allowCustomValue
-                                    options={[
-                                        ...new Set([aiModels[p.key], ...p.models].filter(Boolean)),
-                                    ].map((m) => ({ value: m, label: m }))}
-                                    value={aiModels[p.key]}
-                                    onChange={(v) => setAiModels((prev) => ({ ...prev, [p.key]: v }))}
-                                    placeholder={p.defaultModel}
-                                    searchPlaceholder="Model ara veya yaz..."
-                                    accentColor="#663259"
-                                />
+                            {/* Başlık + durum rozeti */}
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div
+                                        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                                        style={{ backgroundColor: '#F1E9F0', color: '#663259' }}
+                                    >
+                                        <span className="material-symbols-outlined text-[22px]">{p.icon}</span>
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h4 className="font-bold text-sm text-gray-800 leading-tight">{p.label}</h4>
+                                        <span className="text-[11px] text-gray-400 font-mono">
+                                            {connected ? aiMasked[p.key] : 'Anahtar girilmedi'}
+                                        </span>
+                                    </div>
+                                </div>
+                                <span
+                                    className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full ${
+                                        connected ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-400'
+                                    }`}
+                                >
+                                    <span
+                                        className={`w-1.5 h-1.5 rounded-full ${
+                                            connected ? 'bg-emerald-500' : 'bg-gray-300'
+                                        }`}
+                                    />
+                                    {connected ? 'Bağlı' : 'Bağlı değil'}
+                                </span>
                             </div>
-                            <button
-                                onClick={() => testAiProvider(p.key)}
-                                disabled={testingProvider === p.key || (!aiNewKeys[p.key].trim() && !aiMasked[p.key])}
-                                title={
-                                    !aiNewKeys[p.key].trim() && !aiMasked[p.key]
-                                        ? 'Test etmek için API anahtarı girin'
-                                        : 'Anahtarı kaydeder ve test eder'
-                                }
-                                className="px-4 py-2 rounded-xl bg-gray-100 text-gray-700 text-sm font-bold hover:bg-gray-200 disabled:opacity-40 transition-colors whitespace-nowrap"
+
+                            {/* API Anahtarı */}
+                            <label className="block text-xs font-semibold text-gray-500 mb-1.5">
+                                API Anahtarı
+                            </label>
+                            <div className="relative">
+                                <input
+                                    type={showKey[p.key] ? 'text' : 'password'}
+                                    value={aiNewKeys[p.key] || (showKey[p.key] ? revealedKeys[p.key] : '')}
+                                    onChange={(e) =>
+                                        setAiNewKeys((prev) => ({ ...prev, [p.key]: e.target.value }))
+                                    }
+                                    placeholder={aiMasked[p.key] ? 'Yeni anahtar (değiştirmek için)' : p.keyPlaceholder}
+                                    className="w-full rounded-xl border border-gray-200 px-4 py-2.5 pr-11 text-sm font-mono bg-gray-50/50 focus:bg-white focus:border-[#663259] focus:ring-1 focus:ring-[#663259] outline-none transition-colors"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => toggleReveal(p.key)}
+                                    disabled={!aiNewKeys[p.key].trim() && !aiMasked[p.key]}
+                                    title={showKey[p.key] ? 'Anahtarı gizle' : 'Anahtarı göster'}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-gray-400 hover:text-[#663259] hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                                >
+                                    <span className="material-symbols-outlined text-[18px]">
+                                        {showKey[p.key] ? 'visibility_off' : 'visibility'}
+                                    </span>
+                                </button>
+                            </div>
+                            <a
+                                href={p.apiKeyUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs text-[#663259] hover:underline mt-2"
                             >
-                                {testingProvider === p.key ? 'Test...' : 'Test Et'}
-                            </button>
+                                <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                                API anahtarını buradan al
+                            </a>
+
+                            {/* Ayraç */}
+                            <div className="h-px bg-gray-100 my-4" />
+
+                            {/* Model */}
+                            <label className="block text-xs font-semibold text-gray-500 mb-1.5">Model</label>
+                            <div className="flex items-center gap-2">
+                                <div className="flex-1">
+                                    <CustomSelect
+                                        options={modelOptions}
+                                        value={aiModels[p.key]}
+                                        onChange={(v) => setAiModels((prev) => ({ ...prev, [p.key]: v }))}
+                                        placeholder="Model seçin"
+                                        searchPlaceholder="Model ara..."
+                                        icon={<span className="material-symbols-outlined text-[18px]">tune</span>}
+                                        accentColor="#663259"
+                                    />
+                                </div>
+                                <button
+                                    onClick={() => testAiProvider(p.key)}
+                                    disabled={testingProvider === p.key || !canUse}
+                                    title={
+                                        canUse
+                                            ? 'Anahtarı kaydeder ve test eder'
+                                            : 'Test etmek için API anahtarı girin'
+                                    }
+                                    className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-[#663259] hover:bg-[#55284b] disabled:opacity-40 disabled:hover:bg-[#663259] transition-colors whitespace-nowrap"
+                                >
+                                    {testingProvider === p.key ? 'Test...' : 'Test Et'}
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
 
                 <div className="flex justify-end mt-2">
                     <button
