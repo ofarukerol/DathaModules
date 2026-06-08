@@ -12,7 +12,8 @@ import {
     History,
     CreditCard,
     Clock,
-    UserCircle
+    UserCircle,
+    Scale
 } from 'lucide-react';
 import DatePicker from '../../../components/DatePicker';
 import { useCompanyStore } from '../../../stores/useCompanyStore';
@@ -30,9 +31,16 @@ interface LedgerEntry {
     description: string;
     /** purchase = borc artiran (kirmizi, -), payment = borc azaltan (yesil, +) */
     kind: 'purchase' | 'payment';
-    kindLabel: string;     // 'Alis Faturasi' | 'Odeme' | 'Satis Faturasi' | 'Gider'
+    kindLabel: string;     // 'Alis Faturasi' | 'Odeme' | 'Satis Faturasi' | 'Gider' | 'Duzeltme'
     amount: number;        // lira, pozitif
+    isAdjustment?: boolean; // bakiye duzeltme firsi mi
 }
+
+/**
+ * Bakiye duzeltme hareketlerini ekstrede ayirt etmek + bakiyeyi sunucu-otoriteli
+ * yeniden hesaplatmak icin kullanilan sentinel kategori id'si (gercek bir kategori degil).
+ */
+const BALANCE_ADJUSTMENT_CATEGORY_ID = 'adj_balance_correction';
 
 // UI odeme yontemi -> backend PaymentMethod enum
 const PAYMENT_METHOD_MAP: Record<'nakit' | 'havale' | 'kredi_karti' | 'cek', PaymentMethod> = {
@@ -90,14 +98,16 @@ const CompanyDetail: React.FC = () => {
             }
             for (const t of txns) {
                 const isCredit = t.type === 'INCOME';
+                const isAdjustment = t.category_id === BALANCE_ADJUSTMENT_CATEGORY_ID;
                 entries.push({
                     id: t.id,
                     date: t.date,
                     createdAt: t.created_at,
-                    description: t.description || (isCredit ? 'Ödeme' : 'Gider'),
+                    description: t.description || (isAdjustment ? 'Bakiye Düzeltme' : isCredit ? 'Ödeme' : 'Gider'),
                     kind: isCredit ? 'payment' : 'purchase',
-                    kindLabel: isCredit ? 'Ödeme' : 'Gider',
+                    kindLabel: isAdjustment ? 'Düzeltme' : isCredit ? 'Ödeme' : 'Gider',
                     amount: t.amount,
+                    isAdjustment,
                 });
             }
             setLedger(entries);
@@ -123,6 +133,15 @@ const CompanyDetail: React.FC = () => {
         date: new Date().toISOString().split('T')[0],
         description: '',
         method: 'nakit' as 'nakit' | 'havale' | 'kredi_karti' | 'cek',
+    });
+
+    const [showAdjustModal, setShowAdjustModal] = useState(false);
+    const [adjustSaving, setAdjustSaving] = useState(false);
+    const [adjustError, setAdjustError] = useState<string | null>(null);
+    const [adjustForm, setAdjustForm] = useState({
+        targetBalance: '',
+        date: new Date().toISOString().split('T')[0],
+        description: '',
     });
 
     const filteredEntries = useMemo(() => ledger.filter(t => {
@@ -216,6 +235,47 @@ const CompanyDetail: React.FC = () => {
         }
     };
 
+    const openAdjustModal = () => {
+        setAdjustError(null);
+        setAdjustForm({ targetBalance: '', date: new Date().toISOString().split('T')[0], description: '' });
+        setShowAdjustModal(true);
+    };
+
+    const handleAdjustSave = async () => {
+        if (adjustSaving) return;
+        const target = Number(adjustForm.targetBalance);
+        if (adjustForm.targetBalance.trim() === '' || Number.isNaN(target)) {
+            setAdjustError('Geçerli bir bakiye girin.');
+            return;
+        }
+        // Fark sunucu-otoriteli bakiyeden hesaplanir; 2 ondaliga yuvarla (kurus hassasiyeti).
+        const delta = Math.round((target - currentBalance) * 100) / 100;
+        if (delta === 0) {
+            setAdjustError('Yeni bakiye mevcut bakiye ile aynı; düzeltme gerekmiyor.');
+            return;
+        }
+        setAdjustSaving(true);
+        setAdjustError(null);
+        try {
+            // Fark + ise INCOME (bakiyeyi artirir = alacak), - ise EXPENSE (bakiyeyi azaltir = borc).
+            // Sentinel kategori ile isaretlenir; sunucu bakiyeyi hareketlerden yeniden hesaplar.
+            await financeService.createTransaction({
+                company_id: company.id,
+                category_id: BALANCE_ADJUSTMENT_CATEGORY_ID,
+                type: delta > 0 ? 'INCOME' : 'EXPENSE',
+                amount: Math.abs(delta),
+                date: adjustForm.date,
+                description: adjustForm.description.trim() || 'Bakiye Düzeltme',
+            });
+            setShowAdjustModal(false);
+            await Promise.all([fetchCompanies(), loadLedger()]);
+        } catch {
+            setAdjustError('Düzeltme kaydedilemedi. Lütfen tekrar deneyin veya oturumunuzu yenileyin.');
+        } finally {
+            setAdjustSaving(false);
+        }
+    };
+
     const handleExportExcel = () => {
         const rows = entriesWithBalance.map(e => ({
             'Tarih': e.date,
@@ -281,6 +341,11 @@ const CompanyDetail: React.FC = () => {
         document.body.appendChild(iframe);
     };
 
+    // Bakiye duzeltme modali canli onizleme: hedef bakiye - mevcut bakiye = duzeltme tutari.
+    const adjTargetNum = Number(adjustForm.targetBalance);
+    const adjValid = adjustForm.targetBalance.trim() !== '' && !Number.isNaN(adjTargetNum);
+    const adjDelta = adjValid ? Math.round((adjTargetNum - currentBalance) * 100) / 100 : 0;
+
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-gray-50">
             <div className="flex-1 overflow-hidden p-5 pt-4 flex flex-col gap-4">
@@ -297,6 +362,13 @@ const CompanyDetail: React.FC = () => {
                             >
                                 <CreditCard size={16} />
                                 Ödeme Ekle
+                            </button>
+                            <button
+                                onClick={openAdjustModal}
+                                className="flex items-center gap-2 px-4 py-2 bg-[#F59E0B] text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:bg-[#D97706] active:scale-95"
+                            >
+                                <Scale size={16} />
+                                Bakiye Düzeltme
                             </button>
                             <button
                                 onClick={() => navigate(`/finance/companies/${id}/invoice/new?direction=purchase`)}
@@ -517,16 +589,16 @@ const CompanyDetail: React.FC = () => {
                                         </td>
                                         <td className="px-8 py-5">
                                             <div className="flex items-center gap-3">
-                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${t.kind === 'purchase' ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-500'}`}>
+                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${t.isAdjustment ? 'bg-amber-50 text-amber-500' : t.kind === 'purchase' ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-500'}`}>
                                                     <span className="material-symbols-outlined text-[18px]">
-                                                        {t.kind === 'purchase' ? 'shopping_cart' : 'payments'}
+                                                        {t.isAdjustment ? 'tune' : t.kind === 'purchase' ? 'shopping_cart' : 'payments'}
                                                     </span>
                                                 </div>
                                                 <span className="text-sm font-bold text-gray-600 group-hover:text-[#663259] transition-colors">{t.description}</span>
                                             </div>
                                         </td>
                                         <td className="px-8 py-5">
-                                            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${t.kind === 'purchase' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                                            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${t.isAdjustment ? 'bg-amber-50 text-amber-600' : t.kind === 'purchase' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
                                                 {t.kindLabel}
                                             </span>
                                         </td>
@@ -849,6 +921,116 @@ const CompanyDetail: React.FC = () => {
                                 className="flex-1 px-6 py-3.5 bg-[#10B981] text-white rounded-2xl hover:bg-[#059669] transition-all font-black text-xs uppercase tracking-widest shadow-lg shadow-[#10B981]/20 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {paymentSaving ? 'Kaydediliyor...' : 'Ödemeyi Kaydet'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Bakiye Düzeltme Modal */}
+            {showAdjustModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowAdjustModal(false)} />
+                    <div className="bg-white rounded-[2.5rem] w-full max-w-2xl relative z-10 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                        <div className="px-8 py-5 border-b border-gray-100 flex items-center justify-between bg-amber-50/50">
+                            <div className="flex items-center gap-4">
+                                <div className="w-11 h-11 rounded-2xl bg-[#F59E0B] text-white flex items-center justify-center">
+                                    <Scale size={22} />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black text-gray-800 tracking-tight">Bakiye Düzeltme</h3>
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{company.name}</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowAdjustModal(false)}
+                                className="w-10 h-10 rounded-xl hover:bg-white hover:shadow-md text-gray-400 hover:text-gray-600 transition-all flex items-center justify-center"
+                            >
+                                <Plus size={24} className="rotate-45" />
+                            </button>
+                        </div>
+
+                        <div className="p-8 space-y-5">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Yeni Bakiye (₺)</label>
+                                    <input
+                                        type="number"
+                                        value={adjustForm.targetBalance}
+                                        onChange={(e) => setAdjustForm({ ...adjustForm, targetBalance: e.target.value })}
+                                        placeholder="0,00"
+                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-xl font-black text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#F59E0B]/20 transition-all text-center"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Tarih</label>
+                                    <DatePicker
+                                        value={adjustForm.date}
+                                        onChange={(v) => setAdjustForm({ ...adjustForm, date: v })}
+                                        icon="event"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Açıklama</label>
+                                <textarea
+                                    value={adjustForm.description}
+                                    onChange={(e) => setAdjustForm({ ...adjustForm, description: e.target.value })}
+                                    placeholder="Bakiye Düzeltme"
+                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#F59E0B]/20 transition-all min-h-[64px] resize-none"
+                                />
+                            </div>
+
+                            {/* Onizleme: mevcut -> duzeltme -> yeni */}
+                            <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-2.5">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Mevcut Bakiye</span>
+                                    <span className={`text-sm font-black ${currentBalance < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                        ₺{currentBalance.toLocaleString('tr-TR')}
+                                    </span>
+                                </div>
+                                {adjValid && adjDelta !== 0 && (
+                                    <>
+                                        <div className="flex items-center justify-between pt-2.5 border-t border-gray-200">
+                                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                                Düzeltme · {adjDelta > 0 ? 'Alacak (+)' : 'Borç (−)'}
+                                            </span>
+                                            <span className={`text-sm font-black ${adjDelta > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                                {adjDelta > 0 ? '+' : '−'} ₺{Math.abs(adjDelta).toLocaleString('tr-TR')}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center justify-between pt-2.5 border-t border-gray-200">
+                                            <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Yeni Bakiye</span>
+                                            <span className={`text-base font-black ${adjTargetNum < 0 ? 'text-red-500' : 'text-green-600'}`}>
+                                                ₺{adjTargetNum.toLocaleString('tr-TR')}
+                                            </span>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+
+                            {adjustError && (
+                                <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-red-50 border border-red-100 text-red-600 text-xs font-medium">
+                                    <span className="material-symbols-outlined text-[16px] shrink-0">error</span>
+                                    <span>{adjustError}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="px-8 py-5 bg-gray-50/50 border-t border-gray-100 flex gap-3">
+                            <button
+                                onClick={() => setShowAdjustModal(false)}
+                                className="flex-1 px-6 py-3.5 bg-white text-gray-500 border border-gray-200 rounded-2xl hover:bg-gray-50 hover:text-gray-700 transition-all font-black text-xs uppercase tracking-widest"
+                            >
+                                İptal
+                            </button>
+                            <button
+                                onClick={handleAdjustSave}
+                                disabled={adjustSaving}
+                                className="flex-1 px-6 py-3.5 bg-[#F59E0B] text-white rounded-2xl hover:bg-[#D97706] transition-all font-black text-xs uppercase tracking-widest shadow-lg shadow-[#F59E0B]/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {adjustSaving ? 'Kaydediliyor...' : 'Düzeltmeyi Kaydet'}
                             </button>
                         </div>
                     </div>
