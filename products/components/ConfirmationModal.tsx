@@ -1,4 +1,5 @@
 import React from 'react';
+import { useEscapeKey } from '../../_shared/useEscapeKey';
 
 interface ConfirmationModalProps {
     isOpen: boolean;
@@ -21,6 +22,8 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     cancelText = 'İptal',
     type = 'info',
 }) => {
+    useEscapeKey(onCancel, isOpen);
+
     if (!isOpen) return null;
 
     const colorMap = {

@@ -10,6 +10,7 @@ import DatePicker from '../../../components/DatePicker';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import PageToolbar from '@/components/PageToolbar';
 import FinanceTransactionModal from '../components/FinanceTransactionModal';
+import { useEscapeKey } from '../../_shared/useEscapeKey';
 import type { BankTransactionType, CheckType, CheckStatus, CheckNote } from '../types';
 
 // ============ HELPERS ============
@@ -236,6 +237,10 @@ export default function Banks() {
         type: 'CHECK_RECEIVED' as CheckType, company_name: '', amount: '', currency: 'TRY',
         issue_date: '', due_date: '', bank_name: '', check_number: '', notes: '',
     });
+
+    // ESC ile acik modali kapat (inline modallar; FinanceTransactionModal kendi ESC'ini yonetir).
+    useEscapeKey(() => setShowBankModal(false), showBankModal);
+    useEscapeKey(() => setShowCheckModal(false), showCheckModal);
 
 
     useEffect(() => {

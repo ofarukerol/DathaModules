@@ -3,6 +3,7 @@ import { useCustomerStore } from '../store';
 import { useAddressPrefsStore } from '../addressPrefsStore';
 import type { Customer } from '../types';
 import AddressFields from './AddressFields';
+import { useEscapeKey } from '../../_shared/useEscapeKey';
 import DatePicker from '../../../components/DatePicker';
 
 interface CustomerModalProps {
@@ -12,6 +13,7 @@ interface CustomerModalProps {
 }
 
 const CustomerModal: React.FC<CustomerModalProps> = ({ isOpen, onClose, customerToEdit }) => {
+    useEscapeKey(onClose, isOpen);
     const { addCustomer, updateCustomer } = useCustomerStore();
     const {
         ulke: prefUlke, il: prefIl, ilce: prefIlce, mahalle: prefMahalle,

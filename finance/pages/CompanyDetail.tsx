@@ -22,6 +22,7 @@ import { financeService } from '../services/financeService';
 import { COMPANY_TYPE_LABELS, PAYMENT_METHOD_LABELS, type CompanyType, type PaymentMethod } from '../types';
 import CustomSelect from '../../../components/CustomSelect';
 import PageToolbar from '@/components/PageToolbar';
+import { useEscapeKey } from '../../_shared/useEscapeKey';
 
 /** Cari ekstre satiri — alis faturalari + odeme/gider islemleri birlesimi. */
 interface LedgerEntry {
@@ -143,6 +144,11 @@ const CompanyDetail: React.FC = () => {
         date: new Date().toISOString().split('T')[0],
         description: '',
     });
+
+    // ESC ile acik modali kapat (her modal yalniz acikken dinler).
+    useEscapeKey(() => setShowEditModal(false), showEditModal);
+    useEscapeKey(() => setShowPaymentModal(false), showPaymentModal);
+    useEscapeKey(() => setShowAdjustModal(false), showAdjustModal);
 
     const filteredEntries = useMemo(() => ledger.filter(t => {
         if (!startDate && !endDate) return true;

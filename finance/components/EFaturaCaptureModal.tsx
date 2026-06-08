@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { X, Receipt, Check } from 'lucide-react';
 import EFaturaCaptureSection, { EFaturaCaptureState, emptyEFaturaState } from './EFaturaCaptureSection';
+import { useEscapeKey } from '../../_shared/useEscapeKey';
 
 interface EFaturaCaptureModalProps {
     isOpen: boolean;
@@ -24,6 +25,8 @@ const EFaturaCaptureModal: React.FC<EFaturaCaptureModalProps> = ({
     initialState,
     title = 'E-Belge Bilgileri',
 }) => {
+    useEscapeKey(onClose, isOpen);
+
     const [state, setState] = useState<EFaturaCaptureState>({ ...emptyEFaturaState, requested: true });
 
     useEffect(() => {

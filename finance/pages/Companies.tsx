@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useEscapeKey } from '../../_shared/useEscapeKey';
 import { useNavigate } from 'react-router-dom';
 import { useCompanyStore } from '../../../stores/useCompanyStore';
 import { COMPANY_TYPE_LABELS } from '../types';
@@ -42,6 +43,7 @@ export default function Companies() {
     const [showModal, setShowModal] = useState(false);
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [form, setForm] = useState({ name: '', type: 'CUSTOMER' as CompanyType, phone: '', email: '', city: '' });
+    useEscapeKey(() => setShowModal(false), showModal);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 

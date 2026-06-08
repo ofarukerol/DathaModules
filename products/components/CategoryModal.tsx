@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useProductStore } from '../stores/useProductStore';
+import { useEscapeKey } from '../../_shared/useEscapeKey';
 
 interface CategoryModalProps {
     isOpen: boolean;
@@ -15,6 +16,7 @@ const DEFAULT_COLORS = [
 ];
 
 const CategoryModal: React.FC<CategoryModalProps> = ({ isOpen, onClose }) => {
+    useEscapeKey(onClose, isOpen);
     const { categories, addCategory, deleteCategory } = useProductStore();
     const [newCategoryName, setNewCategoryName] = useState('');
 

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { useEscapeKey } from '../../_shared/useEscapeKey';
 import { useTodoStore } from '../store';
 import { Todo, Tag } from '../types';
 import { todoService } from '../service';
@@ -48,6 +49,7 @@ const TodoKanban: React.FC<TodoKanbanProps> = ({ currentUserName, getUsersFn }) 
     const [showLabelManager, setShowLabelManager] = useState(false);
     const [tags, setTags] = useState<Tag[]>([]);
     const [editingTagId, setEditingTagId] = useState<string | null>(null);
+    useEscapeKey(() => { setShowLabelManager(false); setEditingTagId(null); }, showLabelManager);
     const [editingName, setEditingName] = useState('');
     const [editingColor, setEditingColor] = useState('');
     const [newTagName, setNewTagName] = useState('');

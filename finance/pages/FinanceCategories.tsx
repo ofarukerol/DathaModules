@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, X, Trash2, Pencil, Check, Shield } from 'lucide-react';
+import { useEscapeKey } from '../../_shared/useEscapeKey';
 import { useFinanceCategoryStore, FinanceCategory } from '../stores/useFinanceCategoryStore';
 import GradientHeader from '../../../components/GradientHeader';
 
@@ -19,6 +20,7 @@ const FinanceCategories: React.FC = () => {
 
     const [showModal, setShowModal] = useState(false);
     const [modalType, setModalType] = useState<'income' | 'expense'>('expense');
+    useEscapeKey(() => setShowModal(false), showModal);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [formLabel, setFormLabel] = useState('');
     const [formIcon, setFormIcon] = useState('more_horiz');

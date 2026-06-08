@@ -1,4 +1,5 @@
 import React from 'react';
+import { useEscapeKey } from '../_shared/useEscapeKey';
 import HourlyLineChart from './components/HourlyLineChart';
 import type { SummaryContentProps } from './types';
 
@@ -28,6 +29,8 @@ export default function SummaryContent(props: SummaryContentProps) {
         isDemo, onLogoutAndRegister,
         favorites, showFavoritesModal, onToggleFavoritesModal, onToggleFavorite, onNavigate,
     } = props;
+
+    useEscapeKey(() => onToggleFavoritesModal(false), showFavoritesModal);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter') onAddTask();
