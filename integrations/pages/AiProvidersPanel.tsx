@@ -45,8 +45,11 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
     const [aiMasked, setAiMasked] = useState<Record<AiProviderKey, string>>(
         () => buildProviderRecord(() => ''),
     );
-    const [saving, setSaving] = useState(false);
     const [testingProvider, setTestingProvider] = useState<AiProviderKey | null>(null);
+    // Sağlayıcı API'sinden canlı çekilen güncel modeller (anahtar varsa). Boşsa statik listeye düşülür.
+    const [liveModels, setLiveModels] = useState<Record<AiProviderKey, string[]>>(
+        () => buildProviderRecord(() => []),
+    );
     // Göz ile gösterme: hangi sağlayıcının anahtarı açık + çözülmüş açık metin önbelleği.
     const [showKey, setShowKey] = useState<Record<AiProviderKey, boolean>>(
         () => buildProviderRecord(() => false),
@@ -75,6 +78,18 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
                     });
                     return next;
                 });
+                // Bağlı sağlayıcılar için güncel model listesini sağlayıcı API'sinden canlı çek.
+                keys.forEach((k) => {
+                    if (!isAiProviderKey(k.provider)) return;
+                    const prov = k.provider;
+                    aiKeysApi
+                        .listModels(prov)
+                        .then((models) => {
+                            if (cancelled || models.length === 0) return;
+                            setLiveModels((prev) => ({ ...prev, [prov]: models }));
+                        })
+                        .catch(() => {});
+                });
             })
             .catch(() => {
                 /* key yoksa sessizce boş kalır */
@@ -83,46 +98,6 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
             cancelled = true;
         };
     }, []);
-
-    const saveKeys = async () => {
-        // Bir sağlayıcı "işlenebilir": ya yeni key girilmiş ya da kayıtlı key var (sadece model).
-        const actionable = AI_PROVIDERS.filter((p) => aiNewKeys[p.key].trim() || aiMasked[p.key]);
-        if (actionable.length === 0) {
-            addToast('error', 'En az bir sağlayıcı için API anahtarı girin.');
-            return;
-        }
-        setSaving(true);
-        try {
-            for (const p of actionable) {
-                await aiKeysApi.upsert(p.key, {
-                    apiKey: aiNewKeys[p.key].trim() || undefined,
-                    modelName: aiModels[p.key].trim() || p.defaultModel,
-                });
-            }
-            setAiNewKeys(buildProviderRecord(() => ''));
-            // Açık metin önbelleğini sıfırla (eski/yeni anahtar karışmasın).
-            setRevealedKeys(buildProviderRecord(() => ''));
-            setShowKey(buildProviderRecord(() => false));
-            addToast('success', 'Yapay zeka anahtarları kaydedildi');
-            // Maske tazeleme best-effort — başarısız olsa bile kaydetmeyi etkilemesin.
-            try {
-                const fresh = await aiKeysApi.list();
-                setAiMasked((prev) => {
-                    const next = { ...prev };
-                    fresh.forEach((k) => {
-                        if (isAiProviderKey(k.provider)) next[k.provider] = k.apiKeyMasked;
-                    });
-                    return next;
-                });
-            } catch {
-                /* maske tazelenemedi — kritik değil */
-            }
-        } catch (err) {
-            addToast('error', backendErrorMessage(err, 'Kaydedilemedi'));
-        } finally {
-            setSaving(false);
-        }
-    };
 
     /** Göz ikonu: anahtarı aç/gizle. Kayıtlı (eklenmiş) anahtar için açık metni backend'den çeker. */
     const toggleReveal = async (provider: AiProviderKey) => {
@@ -143,25 +118,37 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
         setShowKey((prev) => ({ ...prev, [provider]: true }));
     };
 
+    /**
+     * Test Et: önce anahtarı test eder (KAYDETMEDEN), başarılıysa KAYDEDER.
+     * Girilen yeni anahtar varsa onu, yoksa kayıtlı anahtarı doğrular.
+     */
     const testAiProvider = async (provider: AiProviderKey) => {
         const meta = AI_PROVIDERS.find((p) => p.key === provider);
         const typedKey = aiNewKeys[provider].trim();
         const hasSavedKey = !!aiMasked[provider];
+        const modelName = aiModels[provider].trim() || meta?.defaultModel || '';
         if (!typedKey && !hasSavedKey) {
             addToast('error', 'Test etmek için önce API anahtarı girin.');
             return;
         }
         setTestingProvider(provider);
         try {
-            // Test, kayıtlı anahtarı doğrular. Bu yüzden girilen anahtar/model önce
-            // kaydedilir (eklendiğinden emin olunur), ardından test edilir.
+            // 1) KAYDETMEDEN test et (yeni anahtar varsa onunla, yoksa kayıtlıyla).
+            const res = await aiKeysApi.test(
+                provider,
+                typedKey ? { apiKey: typedKey, modelName } : { modelName },
+            );
+            if (!res.success) {
+                addToast('error', res.message);
+                return;
+            }
+            // 2) Başarılıysa kaydet.
             await aiKeysApi.upsert(provider, {
                 apiKey: typedKey || undefined,
-                modelName: aiModels[provider].trim() || meta?.defaultModel || '',
+                modelName,
             });
-            const res = await aiKeysApi.test(provider);
-            addToast(res.success ? 'success' : 'error', res.message);
-            // Maske tazeleme best-effort — başarısız olsa bile test sonucunu etkilemesin.
+            addToast('success', res.message);
+            // 3) Maske + canlı model listesini tazele (best-effort).
             try {
                 const fresh = await aiKeysApi.list();
                 setAiMasked((prev) => {
@@ -171,13 +158,17 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
                     });
                     return next;
                 });
-                if (typedKey) {
-                    setAiNewKeys((prev) => ({ ...prev, [provider]: '' }));
-                    setRevealedKeys((prev) => ({ ...prev, [provider]: '' }));
-                    setShowKey((prev) => ({ ...prev, [provider]: false }));
-                }
+                setAiNewKeys((prev) => ({ ...prev, [provider]: '' }));
+                setRevealedKeys((prev) => ({ ...prev, [provider]: '' }));
+                setShowKey((prev) => ({ ...prev, [provider]: false }));
+                aiKeysApi
+                    .listModels(provider)
+                    .then((models) => {
+                        if (models.length) setLiveModels((prev) => ({ ...prev, [provider]: models }));
+                    })
+                    .catch(() => {});
             } catch {
-                /* maske tazelenemedi — kritik değil */
+                /* tazeleme kritik değil */
             }
         } catch (err) {
             addToast('error', backendErrorMessage(err, 'Test başarısız'));
@@ -220,9 +211,10 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
                 {AI_PROVIDERS.map((p) => {
                     const connected = !!aiMasked[p.key];
                     const canUse = !!aiNewKeys[p.key].trim() || connected;
-                    // Yalnizca guncel modeller listelenir (elle giris yok). Kayitli model
-                    // listede yoksa CustomSelect placeholder gosterir -> kullanici guncel birini secer.
-                    const modelOptions = p.models.map((m) => ({ value: m, label: m }));
+                    // Modeller: anahtar varsa sağlayıcıdan CANLI çekilen güncel liste; yoksa statik.
+                    // Elle giriş yok; kayıtlı model listede yoksa CustomSelect placeholder gösterir.
+                    const sourceModels = liveModels[p.key]?.length ? liveModels[p.key] : p.models;
+                    const modelOptions = sourceModels.map((m) => ({ value: m, label: m }));
                     return (
                         <div
                             key={p.key}
@@ -299,7 +291,7 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
 
                             {/* Model */}
                             <label className="block text-xs font-semibold text-gray-500 mb-1.5">Model</label>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-stretch gap-2">
                                 <div className="flex-1">
                                     <CustomSelect
                                         options={modelOptions}
@@ -307,7 +299,6 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
                                         onChange={(v) => setAiModels((prev) => ({ ...prev, [p.key]: v }))}
                                         placeholder="Model seçin"
                                         searchPlaceholder="Model ara..."
-                                        icon={<span className="material-symbols-outlined text-[18px]">tune</span>}
                                         accentColor="#663259"
                                     />
                                 </div>
@@ -316,10 +307,10 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
                                     disabled={testingProvider === p.key || !canUse}
                                     title={
                                         canUse
-                                            ? 'Anahtarı kaydeder ve test eder'
+                                            ? 'Bağlantıyı test eder; başarılıysa kaydeder'
                                             : 'Test etmek için API anahtarı girin'
                                     }
-                                    className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-[#663259] hover:bg-[#55284b] disabled:opacity-40 disabled:hover:bg-[#663259] transition-colors whitespace-nowrap"
+                                    className="px-5 flex items-center justify-center rounded-xl text-sm font-bold text-white bg-[#663259] hover:bg-[#55284b] disabled:opacity-40 disabled:hover:bg-[#663259] transition-colors whitespace-nowrap"
                                 >
                                     {testingProvider === p.key ? 'Test...' : 'Test Et'}
                                 </button>
@@ -327,16 +318,6 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
                         </div>
                     );
                 })}
-
-                <div className="flex justify-end mt-2">
-                    <button
-                        onClick={saveKeys}
-                        disabled={saving}
-                        className="px-5 py-2.5 rounded-xl bg-[#663259] text-white font-bold text-sm disabled:opacity-50 hover:shadow-lg hover:shadow-[#663259]/20"
-                    >
-                        {saving ? 'Kaydediliyor...' : 'Anahtarları Kaydet'}
-                    </button>
-                </div>
             </Card>
         </div>
     );

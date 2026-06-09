@@ -31,8 +31,8 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
         label: 'OpenAI (GPT)',
         icon: 'smart_toy',
         keyPlaceholder: 'sk-...',
-        defaultModel: 'gpt-4o-mini',
-        models: ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1', 'gpt-4.1-mini', 'o3-mini'],
+        defaultModel: 'gpt-5.4-mini',
+        models: ['gpt-5.5', 'gpt-5.5-pro', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5.1', 'gpt-5'],
         apiKeyUrl: 'https://platform.openai.com/api-keys',
     },
     {
@@ -40,8 +40,8 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
         label: 'Google (Gemini)',
         icon: 'auto_awesome',
         keyPlaceholder: 'AIza...',
-        defaultModel: 'gemini-2.5-flash',
-        models: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'],
+        defaultModel: 'gemini-3.5-flash',
+        models: ['gemini-3.5-flash', 'gemini-3.5-pro', 'gemini-3.1-pro', 'gemini-3.1-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-pro', 'gemini-2.5-flash'],
         apiKeyUrl: 'https://aistudio.google.com/app/apikey',
     },
     {

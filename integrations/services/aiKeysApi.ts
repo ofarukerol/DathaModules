@@ -56,9 +56,25 @@ export const aiKeysApi = {
         await api.delete(`/integrations/ai-keys/${provider}`);
     },
 
-    async test(provider: AiProviderKey): Promise<AiKeyTestResult> {
-        const { data } = await api.post(`/integrations/ai-keys/${provider}/test`);
+    /**
+     * Anahtarı test eder. payload verilirse (apiKey/modelName) KAYDETMEDEN onu test eder
+     * ("önce test, başarılıysa kaydet"); verilmezse kayıtlı anahtarı test eder.
+     */
+    async test(
+        provider: AiProviderKey,
+        payload?: { apiKey?: string; modelName?: string },
+    ): Promise<AiKeyTestResult> {
+        const { data } = await api.post(`/integrations/ai-keys/${provider}/test`, payload ?? {});
         return unwrap<AiKeyTestResult>(data);
+    },
+
+    /**
+     * Sağlayıcının güncel modellerini sağlayıcı API'sinden getirir. apiKey verilirse
+     * onunla (kaydetmeden), yoksa kayıtlı anahtarla. Anahtar yoksa boş döner.
+     */
+    async listModels(provider: AiProviderKey, apiKey?: string): Promise<string[]> {
+        const { data } = await api.post(`/integrations/ai-keys/${provider}/models`, { apiKey });
+        return unwrap<{ provider: AiProviderKey; models: string[] }>(data).models ?? [];
     },
 
     /** Kayıtlı anahtarı açık metin olarak getirir (kullanıcı "göster" ile talep eder). */
