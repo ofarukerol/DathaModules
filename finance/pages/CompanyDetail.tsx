@@ -367,53 +367,109 @@ const CompanyDetail: React.FC = () => {
         }
     };
 
+    const periodLabel = startDate || endDate ? `${startDate || '...'} – ${endDate || '...'}` : 'Tüm Dönem';
+
     const handleExportExcel = () => {
-        const rows = entriesWithBalance.map(e => ({
-            'Tarih': e.date,
-            'İşlem': e.description,
-            'Tür': e.kindLabel,
-            'Tutar (₺)': e.kind === 'purchase' ? -e.amount : e.amount,
-            'Bakiye (₺)': e.balanceAfter,
-        }));
-        const ws = XLSX.utils.json_to_sheet(rows);
+        const aoa: (string | number)[][] = [
+            ['CARİ EKSTRE'],
+            [company.name],
+            [company.title || ''],
+            ['Dönem', periodLabel],
+            [],
+            ['Tarih', 'İşlem', 'Tür', 'Tutar (₺)', 'Bakiye (₺)'],
+            ...entriesWithBalance.map(e => [
+                e.date,
+                e.description,
+                e.kindLabel,
+                e.kind === 'purchase' ? -e.amount : e.amount,
+                e.balanceAfter,
+            ]),
+            [],
+            ['', '', 'Toplam Alım', periodTotals.purchase, ''],
+            ['', '', 'Toplam Ödeme', periodTotals.payment, ''],
+            ['', '', 'Güncel Bakiye', currentBalance, currentBalance < 0 ? 'Borçlu' : 'Alacaklı'],
+        ];
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        ws['!cols'] = [{ wch: 14 }, { wch: 42 }, { wch: 16 }, { wch: 16 }, { wch: 16 }];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Ekstre');
         XLSX.writeFile(wb, `${company.name.replace(/[^\p{L}\p{N}_-]+/gu, '_')}-ekstre.xlsx`);
     };
 
     const handleExportPdf = () => {
-        const rowsHtml = entriesWithBalance.map(e => `
-            <tr>
+        const balanceLabel = currentBalance < 0 ? 'Borçlu' : 'Alacaklı';
+        const balCls = currentBalance < 0 ? 'neg' : 'pos';
+        const rowsHtml = entriesWithBalance.map((e, i) => `
+            <tr${i % 2 ? ' class="alt"' : ''}>
                 <td>${escapeHtml(e.date)}</td>
                 <td>${escapeHtml(e.description)}</td>
-                <td>${escapeHtml(e.kindLabel)}</td>
-                <td class="num">${e.kind === 'purchase' ? '-' : '+'} ${escapeHtml(fmtTL(e.amount))} ₺</td>
-                <td class="num">${escapeHtml(fmtTL(e.balanceAfter))} ₺</td>
+                <td><span class="badge ${e.isAdjustment ? 'adj' : e.kind}">${escapeHtml(e.kindLabel)}</span></td>
+                <td class="num ${e.kind === 'purchase' ? 'neg' : 'pos'}">${e.kind === 'purchase' ? '−' : '+'} ₺${escapeHtml(fmtTL(e.amount))}</td>
+                <td class="num strong">₺${escapeHtml(fmtTL(e.balanceAfter))}</td>
             </tr>`).join('');
         const html = `<!doctype html><html lang="tr"><head><meta charset="utf-8">
             <title>${escapeHtml(company.name)} - Cari Ekstre</title>
             <style>
-                * { font-family: Arial, sans-serif; }
-                body { padding: 24px; color: #1f2937; }
-                h1 { font-size: 18px; margin: 0 0 4px; }
-                .sub { color: #6b7280; font-size: 12px; margin: 0 0 16px; }
-                table { width: 100%; border-collapse: collapse; font-size: 12px; }
-                th, td { padding: 8px 10px; border-bottom: 1px solid #e5e7eb; text-align: left; }
-                th { background: #f3f4f6; text-transform: uppercase; font-size: 10px; letter-spacing: .05em; }
-                .num { text-align: right; white-space: nowrap; }
-                .totals { margin-top: 16px; font-size: 13px; }
-                .totals span { margin-right: 24px; }
+                @page { size: A4; margin: 14mm 12mm; }
+                * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                body { font-family: 'Segoe UI', Roboto, Arial, sans-serif; color: #1f2937; margin: 0; font-size: 12px; }
+                .head { background: linear-gradient(135deg,#663259 0%,#4A235A 60%,#3d1d4b 100%); color:#fff; border-radius:16px; padding:22px 26px; display:flex; justify-content:space-between; align-items:flex-start; gap:16px; }
+                .head .t { font-size:10px; letter-spacing:3px; text-transform:uppercase; opacity:.7; font-weight:800; }
+                .head h1 { font-size:22px; margin:5px 0 3px; font-weight:800; }
+                .head .period { font-size:11px; opacity:.85; }
+                .head .right { text-align:right; }
+                .head .right .nm { font-size:14px; font-weight:800; }
+                .head .right .sub { font-size:10px; opacity:.8; margin-top:2px; }
+                .info { display:flex; gap:28px; flex-wrap:wrap; margin:16px 4px; }
+                .info div { color:#9ca3af; font-size:9px; text-transform:uppercase; letter-spacing:.5px; font-weight:700; }
+                .info b { color:#374151; display:block; font-size:12px; font-weight:700; text-transform:none; letter-spacing:0; margin-bottom:1px; }
+                .cards { display:flex; gap:12px; margin:14px 0 18px; }
+                .card { flex:1; border:1px solid #eee; border-radius:14px; padding:13px 16px; }
+                .card .lbl { font-size:9px; letter-spacing:1.2px; text-transform:uppercase; font-weight:800; color:#9ca3af; }
+                .card .val { font-size:18px; font-weight:800; margin-top:6px; }
+                .card.red { background:#fef2f2; border-color:#fee2e2;} .card.red .val{color:#dc2626;}
+                .card.green { background:#f0fdf4; border-color:#dcfce7;} .card.green .val{color:#16a34a;}
+                .card.bal { background:#faf5fb; border-color:#f0e6f2;}
+                .card.bal .val.neg{color:#dc2626;} .card.bal .val.pos{color:#16a34a;}
+                .card.bal .tag { font-size:8px; font-weight:800; padding:2px 7px; border-radius:6px; margin-left:8px; vertical-align:middle; }
+                .tag.neg{ background:#fee2e2; color:#dc2626;} .tag.pos{ background:#dcfce7; color:#16a34a;}
+                table { width:100%; border-collapse:collapse; }
+                thead th { background:#f9fafb; color:#9ca3af; text-transform:uppercase; font-size:9px; letter-spacing:1px; font-weight:800; padding:9px 11px; text-align:left; border-bottom:2px solid #f0f0f0; }
+                thead th.num { text-align:right; }
+                tbody td { padding:9px 11px; border-bottom:1px solid #f3f4f6; font-size:11px; }
+                tbody tr.alt { background:#fcfcfd; }
+                .num { text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+                .num.neg{ color:#dc2626; font-weight:700;} .num.pos{ color:#16a34a; font-weight:700;} .num.strong{ font-weight:800; color:#111827;}
+                .badge { font-size:9px; font-weight:800; text-transform:uppercase; padding:3px 8px; border-radius:6px; white-space:nowrap; }
+                .badge.purchase{ background:#fef2f2; color:#dc2626;} .badge.payment{ background:#f0fdf4; color:#16a34a;} .badge.adj{ background:#fffbeb; color:#d97706;}
+                .foot { margin-top:18px; padding-top:10px; border-top:1px solid #f0f0f0; display:flex; justify-content:space-between; font-size:9px; color:#9ca3af; }
             </style></head><body>
-            <h1>${escapeHtml(company.name)}</h1>
-            <p class="sub">${escapeHtml(company.title || '')} · Cari Ekstre${startDate || endDate ? ` (${escapeHtml(startDate || '...')} – ${escapeHtml(endDate || '...')})` : ''}</p>
+            <div class="head">
+                <div>
+                    <div class="t">Cari Ekstre</div>
+                    <h1>${escapeHtml(company.name)}</h1>
+                    <div class="period">Dönem: ${escapeHtml(periodLabel)}</div>
+                </div>
+                <div class="right">
+                    <div class="nm">${escapeHtml(company.title || company.name)}</div>
+                    <div class="sub">${escapeHtml([company.tax_office, company.tax_number].filter(Boolean).join(' · ') || '')}</div>
+                </div>
+            </div>
+            <div class="info">
+                <div><b>${escapeHtml(company.contact_person || '-')}</b>Yetkili</div>
+                <div><b>${escapeHtml(company.phone || '-')}</b>Telefon</div>
+                <div><b>${escapeHtml(company.address || '-')}</b>Adres</div>
+            </div>
+            <div class="cards">
+                <div class="card red"><div class="lbl">Toplam Alım</div><div class="val">₺${escapeHtml(fmtTL(periodTotals.purchase))}</div></div>
+                <div class="card green"><div class="lbl">Toplam Ödeme</div><div class="val">₺${escapeHtml(fmtTL(periodTotals.payment))}</div></div>
+                <div class="card bal"><div class="lbl">Güncel Bakiye</div><div class="val ${balCls}">₺${escapeHtml(fmtTL(currentBalance))}<span class="tag ${balCls}">${balanceLabel}</span></div></div>
+            </div>
             <table><thead><tr>
                 <th>Tarih</th><th>İşlem</th><th>Tür</th><th class="num">Tutar</th><th class="num">Bakiye</th>
-            </tr></thead><tbody>${rowsHtml || '<tr><td colspan="5">Kayıt bulunamadı.</td></tr>'}</tbody></table>
-            <div class="totals">
-                <span>Toplam Alım: <b>${escapeHtml(fmtTL(periodTotals.purchase))} ₺</b></span>
-                <span>Toplam Ödeme: <b>${escapeHtml(fmtTL(periodTotals.payment))} ₺</b></span>
-                <span>Güncel Bakiye: <b>${escapeHtml(fmtTL(currentBalance))} ₺</b></span>
-            </div></body></html>`;
+            </tr></thead><tbody>${rowsHtml || '<tr><td colspan="5" style="text-align:center;color:#9ca3af;padding:28px;">Kayıt bulunamadı.</td></tr>'}</tbody></table>
+            <div class="foot"><span>Datha · Cari Ekstre</span><span>${escapeHtml(new Date().toLocaleString('tr-TR'))}</span></div>
+            </body></html>`;
         const iframe = document.createElement('iframe');
         iframe.style.position = 'fixed';
         iframe.style.right = '0';
@@ -657,22 +713,22 @@ const CompanyDetail: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto custom-scrollbar">
-                        <table className="w-full text-left border-collapse">
+                    <div className="flex-1 overflow-auto custom-scrollbar">
+                        <table className="w-full min-w-[680px] text-left border-collapse">
                             <thead>
                                 <tr className="bg-gray-50/50 sticky top-0 z-10 backdrop-blur-md">
-                                    <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Tarih / Saat</th>
-                                    <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">İşlem Detayı</th>
-                                    <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Tür</th>
-                                    <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Miktar</th>
-                                    <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Bakiye</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Tarih / Saat</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">İşlem Detayı</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Tür</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Miktar</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Bakiye</th>
                                     <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">İşlem</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
                                 {entriesWithBalance.map(t => (
                                     <tr key={t.id} className="hover:bg-[#663259]/[0.02] transition-colors group">
-                                        <td className="px-8 py-5">
+                                        <td className="px-6 py-5">
                                             <div className="flex flex-col">
                                                 <span className="text-sm font-bold text-gray-700">{t.date}</span>
                                                 <span className="text-[10px] text-gray-400 font-medium">
@@ -680,7 +736,7 @@ const CompanyDetail: React.FC = () => {
                                                 </span>
                                             </div>
                                         </td>
-                                        <td className="px-8 py-5">
+                                        <td className="px-6 py-5">
                                             <div className="flex items-center gap-3">
                                                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${t.isAdjustment ? 'bg-amber-50 text-amber-500' : t.kind === 'purchase' ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-500'}`}>
                                                     <span className="material-symbols-outlined text-[18px]">
@@ -690,21 +746,21 @@ const CompanyDetail: React.FC = () => {
                                                 <span className="text-sm font-bold text-gray-600 group-hover:text-[#663259] transition-colors">{t.description}</span>
                                             </div>
                                         </td>
-                                        <td className="px-8 py-5">
+                                        <td className="px-6 py-5">
                                             <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${t.isAdjustment ? 'bg-amber-50 text-amber-600' : t.kind === 'purchase' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
                                                 {t.kindLabel}
                                             </span>
                                         </td>
-                                        <td className="px-8 py-5 text-right">
+                                        <td className="px-6 py-5 text-right">
                                             <span className={`text-base font-black ${t.kind === 'purchase' ? 'text-red-500' : 'text-green-500'}`}>
                                                 {t.kind === 'purchase' ? '-' : '+'} ₺{t.amount.toLocaleString('tr-TR')}
                                             </span>
                                         </td>
-                                        <td className="px-8 py-5 text-right">
+                                        <td className="px-6 py-5 text-right">
                                             <span className="text-sm font-black text-gray-800 tracking-tight">₺{t.balanceAfter.toLocaleString('tr-TR')}</span>
                                         </td>
                                         <td className="px-6 py-5 text-right">
-                                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="flex items-center justify-end gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
                                                 {t.localId ? (
                                                     <>
                                                         {t.source === 'transaction' && (
