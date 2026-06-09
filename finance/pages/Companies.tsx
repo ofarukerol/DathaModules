@@ -9,6 +9,7 @@ import CustomSelect from '../../../components/CustomSelect';
 import EmptyState from '../../../components/EmptyState';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import PageToolbar from '@/components/PageToolbar';
+import PaymentListModal from '../components/PaymentListModal';
 
 const TYPE_COLORS: Record<CompanyType, { badge: string; avatar: string }> = {
     CUSTOMER: { badge: 'text-blue-600 bg-blue-50', avatar: 'bg-blue-100 text-blue-700' },
@@ -46,6 +47,7 @@ export default function Companies() {
     useEscapeKey(() => setShowModal(false), showModal);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [showPaymentList, setShowPaymentList] = useState(false);
 
     useEffect(() => { fetchCompanies(); }, []);
 
@@ -94,13 +96,22 @@ export default function Companies() {
                     title="Cari Hesaplar"
                     stats={`${companies.length} firma kayıtlı`}
                     actions={
-                        <button
-                            onClick={() => { setError(null); setShowModal(true); }}
-                            className="flex items-center gap-2 px-4 py-2 bg-white text-[#663259] rounded-xl text-sm font-bold transition-all shadow-sm hover:bg-white/90 active:scale-95"
-                        >
-                            <span className="material-symbols-outlined text-[18px]">add</span>
-                            Yeni Cari
-                        </button>
+                        <div className="flex items-center gap-2.5">
+                            <button
+                                onClick={() => setShowPaymentList(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-white/10 text-white border border-white/15 rounded-xl text-sm font-bold transition-all hover:bg-white/20 active:scale-95"
+                            >
+                                <span className="material-symbols-outlined text-[18px]">account_balance_wallet</span>
+                                Ödeme Listesi
+                            </button>
+                            <button
+                                onClick={() => { setError(null); setShowModal(true); }}
+                                className="flex items-center gap-2 px-4 py-2 bg-white text-[#663259] rounded-xl text-sm font-bold transition-all shadow-sm hover:bg-white/90 active:scale-95"
+                            >
+                                <span className="material-symbols-outlined text-[18px]">add</span>
+                                Yeni Cari
+                            </button>
+                        </div>
                     }
                 />
 
@@ -416,6 +427,12 @@ export default function Companies() {
                 confirmLabel="Sil"
                 onConfirm={async () => { if (deleteId) await deleteCompany(deleteId); setDeleteId(null); }}
                 onCancel={() => setDeleteId(null)}
+            />
+
+            <PaymentListModal
+                isOpen={showPaymentList}
+                onClose={() => setShowPaymentList(false)}
+                companies={companies}
             />
         </div>
     );
