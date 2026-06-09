@@ -75,6 +75,14 @@ export default function Companies() {
     const supplierCount = companies.filter((c) => c.type === 'SUPPLIER').length;
     const bothCount = companies.filter((c) => c.type === 'BOTH').length;
 
+    // Borc/alacak ozeti (gosterilen liste uzerinden; bakiye sunucu-otoriteli).
+    // balance > 0 = Alacakli (bizde kredi/onlar borclu), balance < 0 = Borclu (biz borcluyuz).
+    const totalAlacak = companies.reduce((s, c) => (c.balance > 0 ? s + c.balance : s), 0);
+    const totalBorc = companies.reduce((s, c) => (c.balance < 0 ? s + Math.abs(c.balance) : s), 0);
+    const alacakliCount = companies.filter((c) => c.balance > 0).length;
+    const borcluCount = companies.filter((c) => c.balance < 0).length;
+    const netBalance = Math.round((totalAlacak - totalBorc) * 100) / 100;
+
     const hasActiveFilter = !!filters.search || !!filters.type;
 
     return (
@@ -95,6 +103,42 @@ export default function Companies() {
                         </button>
                     }
                 />
+
+                {/* Borç / Alacak Özeti */}
+                {companies.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 shrink-0">
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex items-center gap-3">
+                            <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                                <span className="material-symbols-outlined">trending_up</span>
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Toplam Alacak</p>
+                                <p className="text-lg font-black text-emerald-600 truncate">{formatCurrency(totalAlacak)}</p>
+                                <p className="text-[10px] text-gray-400 font-bold">{alacakliCount} alacaklı cari</p>
+                            </div>
+                        </div>
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex items-center gap-3">
+                            <div className="w-11 h-11 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+                                <span className="material-symbols-outlined">trending_down</span>
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Toplam Borç</p>
+                                <p className="text-lg font-black text-red-600 truncate">{formatCurrency(totalBorc)}</p>
+                                <p className="text-[10px] text-gray-400 font-bold">{borcluCount} borçlu cari</p>
+                            </div>
+                        </div>
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex items-center gap-3">
+                            <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${netBalance < 0 ? 'bg-red-50 text-red-600' : 'bg-[#663259]/10 text-[#663259]'}`}>
+                                <span className="material-symbols-outlined">account_balance</span>
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Net Durum</p>
+                                <p className={`text-lg font-black truncate ${netBalance < 0 ? 'text-red-600' : 'text-emerald-600'}`}>{formatCurrency(Math.abs(netBalance))}</p>
+                                <p className="text-[10px] text-gray-400 font-bold">{netBalance < 0 ? 'Net Borçlu' : 'Net Alacaklı'}</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Filter Bar */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-4 py-3 flex items-center gap-3 shrink-0 flex-wrap">
