@@ -17,6 +17,23 @@ interface ManualRow { id: string; name: string; amount: string; }
 
 const fmt = (n: number) => formatCurrency(n);
 
+/** tr-TR formatli girisi sayiya cevir: "150.000,50" -> 150000.5 */
+const parseAmount = (s: string): number => {
+    if (!s) return 0;
+    const n = Number(s.replace(/\./g, '').replace(',', '.'));
+    return Number.isFinite(n) ? n : 0;
+};
+
+/** Girisi tr-TR binlik ayraciyla bicimle (yazarken): "150000" -> "150.000", "1234,5" -> "1.234,5" */
+const formatAmountInput = (raw: string): string => {
+    let s = raw.replace(/[^\d,]/g, '');
+    const ci = s.indexOf(',');
+    if (ci !== -1) s = s.slice(0, ci + 1) + s.slice(ci + 1).replace(/,/g, '');
+    const [intP, decP] = s.split(',');
+    const intF = (intP || '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return decP !== undefined ? `${intF},${decP.slice(0, 2)}` : intF;
+};
+
 export default function PaymentListModal({ isOpen, onClose, companies }: PaymentListModalProps) {
     useEscapeKey(onClose, isOpen);
 
@@ -45,12 +62,12 @@ export default function PaymentListModal({ isOpen, onClose, companies }: Payment
 
     const allocatedTotal = useMemo(() => {
         let sum = 0;
-        for (const v of Object.values(allocations)) sum += Number(v) || 0;
-        for (const m of manualRows) sum += Number(m.amount) || 0;
+        for (const v of Object.values(allocations)) sum += parseAmount(v);
+        for (const m of manualRows) sum += parseAmount(m.amount);
         return Math.round(sum * 100) / 100;
     }, [allocations, manualRows]);
 
-    const totalNum = Number(total) || 0;
+    const totalNum = parseAmount(total);
     const remaining = Math.round((totalNum - allocatedTotal) * 100) / 100;
 
     const loadHistory = async () => {
@@ -81,11 +98,11 @@ export default function PaymentListModal({ isOpen, onClose, companies }: Payment
         if (totalNum <= 0) { setError('Geçerli bir toplam tutar girin.'); return; }
         const items = [
             ...borcluCompanies
-                .filter((c) => (Number(allocations[c.id]) || 0) > 0)
-                .map((c) => ({ companyId: c.id, balanceSnapshot: c.balance, amount: Number(allocations[c.id]) })),
+                .filter((c) => parseAmount(allocations[c.id] ?? '') > 0)
+                .map((c) => ({ companyId: c.id, balanceSnapshot: c.balance, amount: parseAmount(allocations[c.id] ?? '') })),
             ...manualRows
-                .filter((m) => m.name.trim() && (Number(m.amount) || 0) > 0)
-                .map((m) => ({ manualName: m.name.trim(), amount: Number(m.amount) })),
+                .filter((m) => m.name.trim() && parseAmount(m.amount) > 0)
+                .map((m) => ({ manualName: m.name.trim(), amount: parseAmount(m.amount) })),
         ];
         if (items.length === 0) { setError('En az bir satıra tutar girin.'); return; }
         setSaving(true); setError(null);
@@ -141,7 +158,7 @@ export default function PaymentListModal({ isOpen, onClose, companies }: Payment
                             <div className="md:col-span-2 space-y-1">
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Toplam Tutar (₺)</label>
                                 <input
-                                    type="number" value={total} onChange={(e) => setTotal(e.target.value)} placeholder="0,00" autoFocus
+                                    type="text" inputMode="decimal" value={total} onChange={(e) => setTotal(formatAmountInput(e.target.value))} placeholder="0,00" autoFocus
                                     className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-2xl font-black text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#663259]/15 transition-all"
                                 />
                             </div>
@@ -187,8 +204,8 @@ export default function PaymentListModal({ isOpen, onClose, companies }: Payment
                                             <td className="py-2.5 text-right text-sm font-black text-red-500">{fmt(Math.abs(c.balance))}</td>
                                             <td className="py-2.5 text-right">
                                                 <input
-                                                    type="number" value={allocations[c.id] ?? ''}
-                                                    onChange={(e) => setAllocations((a) => ({ ...a, [c.id]: e.target.value }))}
+                                                    type="text" inputMode="decimal" value={allocations[c.id] ?? ''}
+                                                    onChange={(e) => setAllocations((a) => ({ ...a, [c.id]: formatAmountInput(e.target.value) }))}
                                                     placeholder="0,00"
                                                     className="w-40 px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold text-right text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#663259]/20 transition-all"
                                                 />
@@ -199,7 +216,7 @@ export default function PaymentListModal({ isOpen, onClose, companies }: Payment
                                         <tr key={m.id} className="bg-amber-50/30">
                                             <td className="py-2.5">
                                                 <input
-                                                    type="text" value={m.name}
+                                                    type="text" autoFocus value={m.name}
                                                     onChange={(e) => setManualRows((r) => r.map((x) => x.id === m.id ? { ...x, name: e.target.value } : x))}
                                                     placeholder="Manuel ödeme adı (ör. nakliye)"
                                                     className="w-full px-3 py-2 bg-white border border-amber-100 rounded-xl text-sm font-bold text-gray-700 focus:outline-none focus:ring-1 focus:ring-amber-300 transition-all"
@@ -209,8 +226,8 @@ export default function PaymentListModal({ isOpen, onClose, companies }: Payment
                                             <td className="py-2.5 text-right">
                                                 <div className="flex items-center justify-end gap-1.5">
                                                     <input
-                                                        type="number" value={m.amount}
-                                                        onChange={(e) => setManualRows((r) => r.map((x) => x.id === m.id ? { ...x, amount: e.target.value } : x))}
+                                                        type="text" inputMode="decimal" value={m.amount}
+                                                        onChange={(e) => setManualRows((r) => r.map((x) => x.id === m.id ? { ...x, amount: formatAmountInput(e.target.value) } : x))}
                                                         placeholder="0,00"
                                                         className="w-32 px-3 py-2 bg-white border border-amber-100 rounded-xl text-sm font-bold text-right text-gray-700 focus:outline-none focus:ring-1 focus:ring-amber-300 transition-all"
                                                     />
