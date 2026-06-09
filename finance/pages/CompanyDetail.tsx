@@ -61,6 +61,14 @@ const PAYMENT_METHOD_MAP: Record<'nakit' | 'havale' | 'kredi_karti' | 'cek', Pay
     cek: 'CHECK',
 };
 
+// Duzenleme modalini onceden doldururken backend PaymentMethod -> UI secimi
+const PAYMENT_METHOD_REVERSE: Record<string, 'nakit' | 'havale' | 'kredi_karti' | 'cek'> = {
+    CASH: 'nakit',
+    BANK_TRANSFER: 'havale',
+    CARD: 'kredi_karti',
+    CHECK: 'cek',
+};
+
 const fmtTL = (n: number) => n.toLocaleString('tr-TR', { minimumFractionDigits: 2 });
 
 const escapeHtml = (s: string): string =>
@@ -163,7 +171,10 @@ const CompanyDetail: React.FC = () => {
         description: '',
     });
 
-    // Hareket duzenleme (sadece transaction) + silme (transaction + fatura) state'leri
+    // Tur-bazli duzenleme: Duzeltme -> Adjust modali, Odeme -> Payment modali (edit modu).
+    const [paymentEditEntry, setPaymentEditEntry] = useState<LedgerEntry | null>(null);
+    const [adjustEditEntry, setAdjustEditEntry] = useState<LedgerEntry | null>(null);
+    // Hareket duzenleme (Gider/diger fallback) + silme (transaction + fatura) state'leri
     const [editEntry, setEditEntry] = useState<LedgerEntry | null>(null);
     const [entryForm, setEntryForm] = useState({ amount: '', date: '', description: '' });
     const [editSaving, setEditSaving] = useState(false);
@@ -238,6 +249,7 @@ const CompanyDetail: React.FC = () => {
 
     const openPaymentModal = () => {
         setPaymentError(null);
+        setPaymentEditEntry(null);
         setPaymentForm({ amount: '', date: new Date().toISOString().split('T')[0], description: '', method: 'nakit' });
         setShowPaymentModal(true);
     };
@@ -252,14 +264,31 @@ const CompanyDetail: React.FC = () => {
         setPaymentError(null);
         try {
             // Cari odeme = borcu azaltir → INCOME islemi (recomputeCompanyBalance: INCOME bakiyeyi artirir).
-            await financeService.createTransaction({
-                company_id: company.id,
-                type: 'INCOME',
-                amount: Number(paymentForm.amount),
-                date: paymentForm.date,
-                description: paymentForm.description || 'Ödeme',
-                payment_method: PAYMENT_METHOD_MAP[paymentForm.method],
-            });
+            if (paymentEditEntry) {
+                await financeService.updateTransaction(
+                    paymentEditEntry.id,
+                    {
+                        type: 'INCOME',
+                        amount: Number(paymentForm.amount),
+                        date: paymentForm.date,
+                        description: paymentForm.description || 'Ödeme',
+                        payment_method: PAYMENT_METHOD_MAP[paymentForm.method],
+                        company_id: company.id,
+                        currency: paymentEditEntry.currency,
+                        category_id: paymentEditEntry.categoryId,
+                    },
+                    paymentEditEntry.localId,
+                );
+            } else {
+                await financeService.createTransaction({
+                    company_id: company.id,
+                    type: 'INCOME',
+                    amount: Number(paymentForm.amount),
+                    date: paymentForm.date,
+                    description: paymentForm.description || 'Ödeme',
+                    payment_method: PAYMENT_METHOD_MAP[paymentForm.method],
+                });
+            }
             setShowPaymentModal(false);
             await Promise.all([fetchCompanies(), loadLedger()]);
         } catch {
@@ -271,6 +300,7 @@ const CompanyDetail: React.FC = () => {
 
     const openAdjustModal = () => {
         setAdjustError(null);
+        setAdjustEditEntry(null);
         setAdjustForm({ direction: 'alim', amount: '', date: new Date().toISOString().split('T')[0], description: '' });
         setShowAdjustModal(true);
     };
@@ -288,14 +318,23 @@ const CompanyDetail: React.FC = () => {
             // Alim -> EXPENSE (borc artar, bakiye azalir); Odeme -> INCOME (borc azalir, bakiye artar).
             // Tutar daima pozitif gonderilir; sunucu EXPENSE'i cikarir, INCOME'i ekler (sunucu-otoriteli bakiye).
             // Sentinel kategori ile isaretlenir; ekstrede "Duzeltme" olarak etiketlenir.
-            await financeService.createTransaction({
+            const data = {
                 company_id: company.id,
                 category_id: BALANCE_ADJUSTMENT_CATEGORY_ID,
-                type: adjustForm.direction === 'odeme' ? 'INCOME' : 'EXPENSE',
+                type: (adjustForm.direction === 'odeme' ? 'INCOME' : 'EXPENSE') as 'INCOME' | 'EXPENSE',
                 amount: Math.abs(amount),
                 date: adjustForm.date,
                 description: adjustForm.description.trim() || 'Bakiye Düzeltme',
-            });
+            };
+            if (adjustEditEntry) {
+                await financeService.updateTransaction(
+                    adjustEditEntry.id,
+                    { ...data, currency: adjustEditEntry.currency },
+                    adjustEditEntry.localId,
+                );
+            } else {
+                await financeService.createTransaction(data);
+            }
             setShowAdjustModal(false);
             await Promise.all([fetchCompanies(), loadLedger()]);
         } catch {
@@ -305,9 +344,37 @@ const CompanyDetail: React.FC = () => {
         }
     };
 
-    /** Hareket (transaction) duzenleme modalini ac. Faturalar inline duzenlenmez. */
+    /**
+     * Hareketi duzenle: turune gore EKLEME modalini (edit modunda) acar.
+     * Duzeltme -> Bakiye Duzeltme modali; Odeme (INCOME) -> Odeme modali; digerleri (Gider) -> generic.
+     */
     const openEditEntry = (entry: LedgerEntry) => {
         if (entry.source !== 'transaction') return;
+        if (entry.isAdjustment) {
+            setAdjustError(null);
+            setAdjustEditEntry(entry);
+            setAdjustForm({
+                direction: entry.txType === 'INCOME' ? 'odeme' : 'alim',
+                amount: String(entry.amount),
+                date: entry.date,
+                description: entry.description,
+            });
+            setShowAdjustModal(true);
+            return;
+        }
+        if (entry.txType === 'INCOME') {
+            setPaymentError(null);
+            setPaymentEditEntry(entry);
+            setPaymentForm({
+                amount: String(entry.amount),
+                date: entry.date,
+                description: entry.description,
+                method: PAYMENT_METHOD_REVERSE[entry.paymentMethod ?? ''] ?? 'nakit',
+            });
+            setShowPaymentModal(true);
+            return;
+        }
+        // Gider / diger: generic duzenleme modali (tutar/tarih/aciklama)
         setEditError(null);
         setEditEntry(entry);
         setEntryForm({ amount: String(entry.amount), date: entry.date, description: entry.description });
@@ -1064,7 +1131,7 @@ const CompanyDetail: React.FC = () => {
                                                 ₺{currentBalance.toLocaleString('tr-TR')}
                                             </span>
                                         </div>
-                                        {paymentForm.amount && (
+                                        {!paymentEditEntry && paymentForm.amount && (
                                             <div className="flex items-center justify-between pt-2 border-t border-gray-200">
                                                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Sonrası</span>
                                                 <span className={`text-sm font-black ${(currentBalance + Number(paymentForm.amount)) < 0 ? 'text-red-500' : 'text-green-500'}`}>
@@ -1096,7 +1163,7 @@ const CompanyDetail: React.FC = () => {
                                 disabled={paymentSaving}
                                 className="flex-1 px-6 py-3.5 bg-[#10B981] text-white rounded-2xl hover:bg-[#059669] transition-all font-black text-xs uppercase tracking-widest shadow-lg shadow-[#10B981]/20 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                {paymentSaving ? 'Kaydediliyor...' : 'Ödemeyi Kaydet'}
+                                {paymentSaving ? 'Kaydediliyor...' : paymentEditEntry ? 'Güncelle' : 'Ödemeyi Kaydet'}
                             </button>
                         </div>
                     </div>
@@ -1189,7 +1256,7 @@ const CompanyDetail: React.FC = () => {
                                         ₺{currentBalance.toLocaleString('tr-TR')}
                                     </span>
                                 </div>
-                                {adjValid && (
+                                {!adjustEditEntry && adjValid && (
                                     <>
                                         <div className="flex items-center justify-between pt-2.5 border-t border-gray-200">
                                             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
@@ -1234,7 +1301,7 @@ const CompanyDetail: React.FC = () => {
                                 disabled={adjustSaving}
                                 className="flex-1 px-6 py-3.5 bg-[#F59E0B] text-white rounded-2xl hover:bg-[#D97706] transition-all font-black text-xs uppercase tracking-widest shadow-lg shadow-[#F59E0B]/20 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                {adjustSaving ? 'Kaydediliyor...' : 'Düzeltmeyi Kaydet'}
+                                {adjustSaving ? 'Kaydediliyor...' : adjustEditEntry ? 'Güncelle' : 'Düzeltmeyi Kaydet'}
                             </button>
                         </div>
                     </div>
