@@ -13,7 +13,8 @@ import {
     CreditCard,
     Clock,
     UserCircle,
-    Scale
+    Scale,
+    Trash2
 } from 'lucide-react';
 import DatePicker from '../../../components/DatePicker';
 import { useCompanyStore } from '../../../stores/useCompanyStore';
@@ -23,6 +24,7 @@ import { COMPANY_TYPE_LABELS, PAYMENT_METHOD_LABELS, type CompanyType, type Paym
 import CustomSelect from '../../../components/CustomSelect';
 import PageToolbar from '@/components/PageToolbar';
 import { useEscapeKey } from '../../_shared/useEscapeKey';
+import ConfirmDialog from '../../../components/ConfirmDialog';
 
 /** Cari ekstre satiri — alis faturalari + odeme/gider islemleri birlesimi. */
 interface LedgerEntry {
@@ -35,6 +37,13 @@ interface LedgerEntry {
     kindLabel: string;     // 'Alis Faturasi' | 'Odeme' | 'Satis Faturasi' | 'Gider' | 'Duzeltme'
     amount: number;        // lira, pozitif
     isAdjustment?: boolean; // bakiye duzeltme firsi mi
+    // Duzenle/sil icin: kaynak + sync esleme + transaction'da korunacak alanlar
+    source: 'invoice' | 'transaction';
+    localId?: string;
+    txType?: 'INCOME' | 'EXPENSE';   // sadece transaction
+    categoryId?: string;             // sadece transaction
+    paymentMethod?: PaymentMethod;   // sadece transaction
+    currency?: string;               // sadece transaction (REPLACE upsert'te korunmasi icin)
 }
 
 /**
@@ -95,6 +104,8 @@ const CompanyDetail: React.FC = () => {
                     kind: isPurchase ? 'purchase' : 'payment',
                     kindLabel: isPurchase ? 'Alış Faturası' : 'Satış Faturası',
                     amount: inv.grand_total,
+                    source: 'invoice',
+                    localId: inv.localId,
                 });
             }
             for (const t of txns) {
@@ -109,6 +120,12 @@ const CompanyDetail: React.FC = () => {
                     kindLabel: isAdjustment ? 'Düzeltme' : isCredit ? 'Ödeme' : 'Gider',
                     amount: t.amount,
                     isAdjustment,
+                    source: 'transaction',
+                    localId: t.localId,
+                    txType: t.type,
+                    categoryId: t.category_id,
+                    paymentMethod: t.payment_method,
+                    currency: t.currency,
                 });
             }
             setLedger(entries);
@@ -146,10 +163,19 @@ const CompanyDetail: React.FC = () => {
         description: '',
     });
 
+    // Hareket duzenleme (sadece transaction) + silme (transaction + fatura) state'leri
+    const [editEntry, setEditEntry] = useState<LedgerEntry | null>(null);
+    const [entryForm, setEntryForm] = useState({ amount: '', date: '', description: '' });
+    const [editSaving, setEditSaving] = useState(false);
+    const [editError, setEditError] = useState<string | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<LedgerEntry | null>(null);
+    const [deleteSaving, setDeleteSaving] = useState(false);
+
     // ESC ile acik modali kapat (her modal yalniz acikken dinler).
     useEscapeKey(() => setShowEditModal(false), showEditModal);
     useEscapeKey(() => setShowPaymentModal(false), showPaymentModal);
     useEscapeKey(() => setShowAdjustModal(false), showAdjustModal);
+    useEscapeKey(() => setEditEntry(null), !!editEntry);
 
     const filteredEntries = useMemo(() => ledger.filter(t => {
         if (!startDate && !endDate) return true;
@@ -275,6 +301,69 @@ const CompanyDetail: React.FC = () => {
             setAdjustError('Düzeltme kaydedilemedi. Lütfen tekrar deneyin veya oturumunuzu yenileyin.');
         } finally {
             setAdjustSaving(false);
+        }
+    };
+
+    /** Hareket (transaction) duzenleme modalini ac. Faturalar inline duzenlenmez. */
+    const openEditEntry = (entry: LedgerEntry) => {
+        if (entry.source !== 'transaction') return;
+        setEditError(null);
+        setEditEntry(entry);
+        setEntryForm({ amount: String(entry.amount), date: entry.date, description: entry.description });
+    };
+
+    const handleEditEntrySave = async () => {
+        if (!editEntry || editSaving) return;
+        const amount = Number(entryForm.amount);
+        if (entryForm.amount.trim() === '' || Number.isNaN(amount) || amount <= 0) {
+            setEditError('Geçerli bir tutar girin.');
+            return;
+        }
+        setEditSaving(true);
+        setEditError(null);
+        try {
+            // Backend sync UPSERT = REPLACE (gonderilmeyen nullable alanlar NULL'a duser).
+            // Bu yuzden company_id + type/category/payment_method ACIKCA gonderilir (hareket cariden
+            // kopmasin), currency korunur; bakiye istemciden gitmez, sunucu yeniden hesaplar.
+            await financeService.updateTransaction(
+                editEntry.id,
+                {
+                    amount,
+                    date: entryForm.date,
+                    description: entryForm.description.trim(),
+                    company_id: company.id,
+                    currency: editEntry.currency,
+                    type: editEntry.txType,
+                    category_id: editEntry.categoryId,
+                    payment_method: editEntry.paymentMethod,
+                },
+                editEntry.localId,
+            );
+            setEditEntry(null);
+            await Promise.all([fetchCompanies(), loadLedger()]);
+        } catch {
+            setEditError('Güncellenemedi. Lütfen tekrar deneyin.');
+        } finally {
+            setEditSaving(false);
+        }
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!deleteTarget || deleteSaving) return;
+        setDeleteSaving(true);
+        const target = deleteTarget;
+        try {
+            if (target.source === 'transaction') {
+                await financeService.deleteTransaction(target.id, target.localId);
+            } else {
+                await invoiceService.delete(target.id);
+            }
+            setDeleteTarget(null);
+            await Promise.all([fetchCompanies(), loadLedger()]);
+        } catch {
+            setDeleteTarget(null);
+        } finally {
+            setDeleteSaving(false);
         }
     };
 
@@ -577,6 +666,7 @@ const CompanyDetail: React.FC = () => {
                                     <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Tür</th>
                                     <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Miktar</th>
                                     <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Bakiye</th>
+                                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">İşlem</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
@@ -612,6 +702,32 @@ const CompanyDetail: React.FC = () => {
                                         </td>
                                         <td className="px-8 py-5 text-right">
                                             <span className="text-sm font-black text-gray-800 tracking-tight">₺{t.balanceAfter.toLocaleString('tr-TR')}</span>
+                                        </td>
+                                        <td className="px-6 py-5 text-right">
+                                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                {t.localId ? (
+                                                    <>
+                                                        {t.source === 'transaction' && (
+                                                            <button
+                                                                onClick={() => openEditEntry(t)}
+                                                                title="Düzenle"
+                                                                className="p-1.5 rounded-lg text-gray-400 hover:bg-[#663259]/10 hover:text-[#663259] transition-colors"
+                                                            >
+                                                                <Edit2 size={15} />
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            onClick={() => setDeleteTarget(t)}
+                                                            title="Sil"
+                                                            className="p-1.5 rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                                                        >
+                                                            <Trash2 size={15} />
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <span className="text-[9px] text-gray-300 font-bold" title="Senkron anahtarı (localId) olmayan kayıt buradan düzenlenemez/silinemez">—</span>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -1067,6 +1183,78 @@ const CompanyDetail: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            {/* Hareketi Düzenle Modal (sadece transaction; tutar/tarih/açıklama) */}
+            {editEntry && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setEditEntry(null)} />
+                    <div className="bg-white rounded-[2.5rem] w-full max-w-xl relative z-10 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                        <div className="px-8 py-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                            <div className="flex items-center gap-4">
+                                <div className="w-11 h-11 rounded-2xl bg-[#663259] text-white flex items-center justify-center">
+                                    <Edit2 size={20} />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black text-gray-800 tracking-tight">Hareketi Düzenle</h3>
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{editEntry.kindLabel}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setEditEntry(null)} className="w-10 h-10 rounded-xl hover:bg-white hover:shadow-md text-gray-400 hover:text-gray-600 transition-all flex items-center justify-center">
+                                <Plus size={24} className="rotate-45" />
+                            </button>
+                        </div>
+                        <div className="p-8 space-y-5">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Tutar (₺)</label>
+                                    <input
+                                        type="number"
+                                        value={entryForm.amount}
+                                        onChange={(e) => setEntryForm({ ...entryForm, amount: e.target.value })}
+                                        placeholder="0,00"
+                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-xl font-black text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#663259]/10 transition-all text-center"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Tarih</label>
+                                    <DatePicker value={entryForm.date} onChange={(v) => setEntryForm({ ...entryForm, date: v })} icon="event" />
+                                </div>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Açıklama</label>
+                                <textarea
+                                    value={entryForm.description}
+                                    onChange={(e) => setEntryForm({ ...entryForm, description: e.target.value })}
+                                    placeholder="Açıklama..."
+                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#663259]/10 transition-all min-h-[64px] resize-none"
+                                />
+                            </div>
+                            {editError && (
+                                <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-red-50 border border-red-100 text-red-600 text-xs font-medium">
+                                    <span className="material-symbols-outlined text-[16px] shrink-0">error</span>
+                                    <span>{editError}</span>
+                                </div>
+                            )}
+                        </div>
+                        <div className="px-8 py-5 bg-gray-50/50 border-t border-gray-100 flex gap-3">
+                            <button onClick={() => setEditEntry(null)} className="flex-1 px-6 py-3.5 bg-white text-gray-500 border border-gray-200 rounded-2xl hover:bg-gray-50 hover:text-gray-700 transition-all font-black text-xs uppercase tracking-widest">İptal</button>
+                            <button onClick={handleEditEntrySave} disabled={editSaving} className="flex-1 px-6 py-3.5 bg-[#663259] text-white rounded-2xl hover:bg-[#4a2340] transition-all font-black text-xs uppercase tracking-widest shadow-lg shadow-[#663259]/20 disabled:opacity-50 disabled:cursor-not-allowed">{editSaving ? 'Kaydediliyor...' : 'Kaydet'}</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Silme onayi (hareket + fatura) */}
+            <ConfirmDialog
+                open={!!deleteTarget}
+                title={deleteTarget?.source === 'invoice' ? 'Faturayı Sil' : 'Hareketi Sil'}
+                message={deleteTarget ? `"${deleteTarget.kindLabel} · ₺${deleteTarget.amount.toLocaleString('tr-TR')}" kaydı silinsin mi? Cari bakiyesi yeniden hesaplanacak.` : ''}
+                confirmLabel={deleteSaving ? 'Siliniyor...' : 'Sil'}
+                cancelLabel="Vazgeç"
+                variant="danger"
+                onConfirm={handleDeleteConfirm}
+                onCancel={() => setDeleteTarget(null)}
+            />
         </div>
     );
 };
