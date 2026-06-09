@@ -140,7 +140,8 @@ const CompanyDetail: React.FC = () => {
     const [adjustSaving, setAdjustSaving] = useState(false);
     const [adjustError, setAdjustError] = useState<string | null>(null);
     const [adjustForm, setAdjustForm] = useState({
-        targetBalance: '',
+        direction: 'alim' as 'alim' | 'odeme',
+        amount: '',
         date: new Date().toISOString().split('T')[0],
         description: '',
     });
@@ -243,33 +244,28 @@ const CompanyDetail: React.FC = () => {
 
     const openAdjustModal = () => {
         setAdjustError(null);
-        setAdjustForm({ targetBalance: '', date: new Date().toISOString().split('T')[0], description: '' });
+        setAdjustForm({ direction: 'alim', amount: '', date: new Date().toISOString().split('T')[0], description: '' });
         setShowAdjustModal(true);
     };
 
     const handleAdjustSave = async () => {
         if (adjustSaving) return;
-        const target = Number(adjustForm.targetBalance);
-        if (adjustForm.targetBalance.trim() === '' || Number.isNaN(target)) {
-            setAdjustError('Geçerli bir bakiye girin.');
-            return;
-        }
-        // Fark sunucu-otoriteli bakiyeden hesaplanir; 2 ondaliga yuvarla (kurus hassasiyeti).
-        const delta = Math.round((target - currentBalance) * 100) / 100;
-        if (delta === 0) {
-            setAdjustError('Yeni bakiye mevcut bakiye ile aynı; düzeltme gerekmiyor.');
+        const amount = Number(adjustForm.amount);
+        if (adjustForm.amount.trim() === '' || Number.isNaN(amount) || amount <= 0) {
+            setAdjustError('Geçerli bir tutar girin.');
             return;
         }
         setAdjustSaving(true);
         setAdjustError(null);
         try {
-            // Fark + ise INCOME (bakiyeyi artirir = alacak), - ise EXPENSE (bakiyeyi azaltir = borc).
-            // Sentinel kategori ile isaretlenir; sunucu bakiyeyi hareketlerden yeniden hesaplar.
+            // Alim -> EXPENSE (borc artar, bakiye azalir); Odeme -> INCOME (borc azalir, bakiye artar).
+            // Tutar daima pozitif gonderilir; sunucu EXPENSE'i cikarir, INCOME'i ekler (sunucu-otoriteli bakiye).
+            // Sentinel kategori ile isaretlenir; ekstrede "Duzeltme" olarak etiketlenir.
             await financeService.createTransaction({
                 company_id: company.id,
                 category_id: BALANCE_ADJUSTMENT_CATEGORY_ID,
-                type: delta > 0 ? 'INCOME' : 'EXPENSE',
-                amount: Math.abs(delta),
+                type: adjustForm.direction === 'odeme' ? 'INCOME' : 'EXPENSE',
+                amount: Math.abs(amount),
                 date: adjustForm.date,
                 description: adjustForm.description.trim() || 'Bakiye Düzeltme',
             });
@@ -347,10 +343,11 @@ const CompanyDetail: React.FC = () => {
         document.body.appendChild(iframe);
     };
 
-    // Bakiye duzeltme modali canli onizleme: hedef bakiye - mevcut bakiye = duzeltme tutari.
-    const adjTargetNum = Number(adjustForm.targetBalance);
-    const adjValid = adjustForm.targetBalance.trim() !== '' && !Number.isNaN(adjTargetNum);
-    const adjDelta = adjValid ? Math.round((adjTargetNum - currentBalance) * 100) / 100 : 0;
+    // Bakiye duzeltme modali canli onizleme: yon (Alim=-, Odeme=+) * tutar = isaretli duzeltme; yeni bakiye = mevcut + delta.
+    const adjAmountNum = Number(adjustForm.amount);
+    const adjValid = adjustForm.amount.trim() !== '' && !Number.isNaN(adjAmountNum) && adjAmountNum > 0;
+    const adjSignedDelta = adjValid ? (adjustForm.direction === 'odeme' ? adjAmountNum : -adjAmountNum) : 0;
+    const adjNewBalance = Math.round((currentBalance + adjSignedDelta) * 100) / 100;
 
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-gray-50">
@@ -470,10 +467,10 @@ const CompanyDetail: React.FC = () => {
                             </div>
 
                             {/* Guncel Bakiye (sunucu-otoriteli) */}
-                            <div className={`p-3 rounded-xl border ${currentBalance < 0 ? 'bg-[#663259]/5 border-[#663259]/10' : 'bg-green-50/60 border-green-100/50'}`}>
+                            <div className={`p-3 rounded-xl border ${currentBalance < 0 ? 'bg-red-50/60 border-red-100/50' : 'bg-green-50/60 border-green-100/50'}`}>
                                 <p className="text-[8px] text-gray-400 font-black uppercase tracking-widest mb-1.5">Güncel Bakiye</p>
                                 <div className="flex items-end justify-between">
-                                    <p className={`text-xl font-black tracking-tight ${currentBalance < 0 ? 'text-[#663259]' : 'text-green-600'}`}>
+                                    <p className={`text-xl font-black tracking-tight ${currentBalance < 0 ? 'text-red-500' : 'text-green-600'}`}>
                                         {currentBalance.toLocaleString('tr-TR')}₺
                                     </p>
                                     <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${currentBalance < 0 ? 'bg-red-100 text-red-500' : 'bg-green-100 text-green-500'}`}>
@@ -957,13 +954,36 @@ const CompanyDetail: React.FC = () => {
                         </div>
 
                         <div className="p-8 space-y-5">
+                            {/* Duzeltme yonu: Alim (borc artar, bakiye azalir) / Odeme (borc azalir, bakiye artar) */}
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Düzeltme Türü</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setAdjustForm({ ...adjustForm, direction: 'alim' })}
+                                        className={`flex flex-col items-start gap-0.5 px-4 py-3 rounded-2xl border-2 transition-all text-left ${adjustForm.direction === 'alim' ? 'bg-red-50 border-red-400 shadow-sm' : 'bg-gray-50 border-gray-100 hover:border-gray-200'}`}
+                                    >
+                                        <span className={`text-sm font-black ${adjustForm.direction === 'alim' ? 'text-red-600' : 'text-gray-600'}`}>Alım · Borç</span>
+                                        <span className="text-[10px] font-bold text-gray-400">Bakiye azalır ↓</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setAdjustForm({ ...adjustForm, direction: 'odeme' })}
+                                        className={`flex flex-col items-start gap-0.5 px-4 py-3 rounded-2xl border-2 transition-all text-left ${adjustForm.direction === 'odeme' ? 'bg-green-50 border-green-400 shadow-sm' : 'bg-gray-50 border-gray-100 hover:border-gray-200'}`}
+                                    >
+                                        <span className={`text-sm font-black ${adjustForm.direction === 'odeme' ? 'text-green-600' : 'text-gray-600'}`}>Ödeme · Alacak</span>
+                                        <span className="text-[10px] font-bold text-gray-400">Bakiye artar ↑</span>
+                                    </button>
+                                </div>
+                            </div>
+
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Yeni Bakiye (₺)</label>
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Tutar (₺)</label>
                                     <input
                                         type="number"
-                                        value={adjustForm.targetBalance}
-                                        onChange={(e) => setAdjustForm({ ...adjustForm, targetBalance: e.target.value })}
+                                        value={adjustForm.amount}
+                                        onChange={(e) => setAdjustForm({ ...adjustForm, amount: e.target.value })}
                                         placeholder="0,00"
                                         className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-xl font-black text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#F59E0B]/20 transition-all text-center"
                                     />
@@ -988,7 +1008,7 @@ const CompanyDetail: React.FC = () => {
                                 />
                             </div>
 
-                            {/* Onizleme: mevcut -> duzeltme -> yeni */}
+                            {/* Onizleme: mevcut -> duzeltme (yon) -> yeni bakiye (Borclu/Alacakli) */}
                             <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-2.5">
                                 <div className="flex items-center justify-between">
                                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Mevcut Bakiye</span>
@@ -996,20 +1016,25 @@ const CompanyDetail: React.FC = () => {
                                         ₺{currentBalance.toLocaleString('tr-TR')}
                                     </span>
                                 </div>
-                                {adjValid && adjDelta !== 0 && (
+                                {adjValid && (
                                     <>
                                         <div className="flex items-center justify-between pt-2.5 border-t border-gray-200">
                                             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                                                Düzeltme · {adjDelta > 0 ? 'Alacak (+)' : 'Borç (−)'}
+                                                {adjustForm.direction === 'alim' ? 'Alım (Borç)' : 'Ödeme (Alacak)'}
                                             </span>
-                                            <span className={`text-sm font-black ${adjDelta > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                                                {adjDelta > 0 ? '+' : '−'} ₺{Math.abs(adjDelta).toLocaleString('tr-TR')}
+                                            <span className={`text-sm font-black ${adjustForm.direction === 'odeme' ? 'text-green-600' : 'text-red-500'}`}>
+                                                {adjustForm.direction === 'odeme' ? '+' : '−'} ₺{adjAmountNum.toLocaleString('tr-TR')}
                                             </span>
                                         </div>
                                         <div className="flex items-center justify-between pt-2.5 border-t border-gray-200">
                                             <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Yeni Bakiye</span>
-                                            <span className={`text-base font-black ${adjTargetNum < 0 ? 'text-red-500' : 'text-green-600'}`}>
-                                                ₺{adjTargetNum.toLocaleString('tr-TR')}
+                                            <span className="flex items-center gap-2">
+                                                <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${adjNewBalance < 0 ? 'bg-red-100 text-red-500' : 'bg-green-100 text-green-500'}`}>
+                                                    {adjNewBalance < 0 ? 'Borçlu' : 'Alacaklı'}
+                                                </span>
+                                                <span className={`text-base font-black ${adjNewBalance < 0 ? 'text-red-500' : 'text-green-600'}`}>
+                                                    ₺{adjNewBalance.toLocaleString('tr-TR')}
+                                                </span>
                                             </span>
                                         </div>
                                     </>
