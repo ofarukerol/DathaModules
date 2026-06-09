@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import {
     Building2,
@@ -25,6 +25,7 @@ import CustomSelect from '../../../components/CustomSelect';
 import PageToolbar from '@/components/PageToolbar';
 import { useEscapeKey } from '../../_shared/useEscapeKey';
 import ConfirmDialog from '../../../components/ConfirmDialog';
+import PurchaseInvoiceModal from '../components/PurchaseInvoiceModal';
 
 /** Cari ekstre satiri — alis faturalari + odeme/gider islemleri birlesimi. */
 interface LedgerEntry {
@@ -67,7 +68,6 @@ const escapeHtml = (s: string): string =>
 
 const CompanyDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
-    const navigate = useNavigate();
     const { companies, fetchCompanies, getCompanyById, updateCompany } = useCompanyStore();
 
     const [startDate, setStartDate] = useState('');
@@ -170,6 +170,7 @@ const CompanyDetail: React.FC = () => {
     const [editError, setEditError] = useState<string | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<LedgerEntry | null>(null);
     const [deleteSaving, setDeleteSaving] = useState(false);
+    const [showPurchaseModal, setShowPurchaseModal] = useState(false);
 
     // ESC ile acik modali kapat (her modal yalniz acikken dinler).
     useEscapeKey(() => setShowEditModal(false), showEditModal);
@@ -519,11 +520,11 @@ const CompanyDetail: React.FC = () => {
                                 Bakiye Düzeltme
                             </button>
                             <button
-                                onClick={() => navigate(`/finance/companies/${id}/invoice/new?direction=purchase`)}
+                                onClick={() => setShowPurchaseModal(true)}
                                 className="flex items-center gap-2 px-4 py-2 bg-[#663259] text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:bg-[#4a2340] active:scale-95"
                             >
                                 <Plus size={16} />
-                                Alış Faturası Ekle
+                                Alış Ekle
                             </button>
                         </div>
                     }
@@ -1310,6 +1311,14 @@ const CompanyDetail: React.FC = () => {
                 variant="danger"
                 onConfirm={handleDeleteConfirm}
                 onCancel={() => setDeleteTarget(null)}
+            />
+
+            <PurchaseInvoiceModal
+                isOpen={showPurchaseModal}
+                onClose={() => setShowPurchaseModal(false)}
+                companyId={company.id}
+                companyName={company.name}
+                onSaved={async () => { await Promise.all([fetchCompanies(), loadLedger()]); }}
             />
         </div>
     );
