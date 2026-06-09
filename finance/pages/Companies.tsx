@@ -99,7 +99,7 @@ export default function Companies() {
                         <div className="flex items-center gap-2.5">
                             <button
                                 onClick={() => setShowPaymentList(true)}
-                                className="flex items-center gap-2 px-4 py-2 bg-white/10 text-white border border-white/15 rounded-xl text-sm font-bold transition-all hover:bg-white/20 active:scale-95"
+                                className="flex items-center gap-2 px-4 py-2 bg-[#663259] text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:bg-[#4a2340] active:scale-95"
                             >
                                 <span className="material-symbols-outlined text-[18px]">account_balance_wallet</span>
                                 Ödeme Listesi
