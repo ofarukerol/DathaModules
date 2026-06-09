@@ -1080,7 +1080,7 @@ const CompanyDetail: React.FC = () => {
                                         className={`flex flex-col items-start gap-0.5 px-4 py-3 rounded-2xl border-2 transition-all text-left ${adjustForm.direction === 'alim' ? 'bg-red-50 border-red-400 shadow-sm' : 'bg-gray-50 border-gray-100 hover:border-gray-200'}`}
                                     >
                                         <span className={`text-sm font-black ${adjustForm.direction === 'alim' ? 'text-red-600' : 'text-gray-600'}`}>Alım · Borç</span>
-                                        <span className="text-[10px] font-bold text-gray-400">Bakiye azalır ↓</span>
+                                        <span className="text-[10px] font-bold text-gray-400">Borç artar ↑</span>
                                     </button>
                                     <button
                                         type="button"
@@ -1088,7 +1088,7 @@ const CompanyDetail: React.FC = () => {
                                         className={`flex flex-col items-start gap-0.5 px-4 py-3 rounded-2xl border-2 transition-all text-left ${adjustForm.direction === 'odeme' ? 'bg-green-50 border-green-400 shadow-sm' : 'bg-gray-50 border-gray-100 hover:border-gray-200'}`}
                                     >
                                         <span className={`text-sm font-black ${adjustForm.direction === 'odeme' ? 'text-green-600' : 'text-gray-600'}`}>Ödeme · Alacak</span>
-                                        <span className="text-[10px] font-bold text-gray-400">Bakiye artar ↑</span>
+                                        <span className="text-[10px] font-bold text-gray-400">Borç azalır ↓</span>
                                     </button>
                                 </div>
                             </div>
