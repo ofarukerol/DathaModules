@@ -182,6 +182,7 @@ const CompanyDetail: React.FC = () => {
     const [deleteTarget, setDeleteTarget] = useState<LedgerEntry | null>(null);
     const [deleteSaving, setDeleteSaving] = useState(false);
     const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+    const [editInvoiceId, setEditInvoiceId] = useState<string | null>(null);
 
     // ESC ile acik modali kapat (her modal yalniz acikken dinler).
     useEscapeKey(() => setShowEditModal(false), showEditModal);
@@ -349,6 +350,12 @@ const CompanyDetail: React.FC = () => {
      * Duzeltme -> Bakiye Duzeltme modali; Odeme (INCOME) -> Odeme modali; digerleri (Gider) -> generic.
      */
     const openEditEntry = (entry: LedgerEntry) => {
+        if (entry.source === 'invoice') {
+            if (entry.kind !== 'purchase') return; // sadece alis faturasi inline duzenlenir
+            setEditInvoiceId(entry.id);
+            setShowPurchaseModal(true);
+            return;
+        }
         if (entry.source !== 'transaction') return;
         if (entry.isAdjustment) {
             setAdjustError(null);
@@ -587,7 +594,7 @@ const CompanyDetail: React.FC = () => {
                                 Bakiye Düzeltme
                             </button>
                             <button
-                                onClick={() => setShowPurchaseModal(true)}
+                                onClick={() => { setEditInvoiceId(null); setShowPurchaseModal(true); }}
                                 className="flex items-center gap-2 px-4 py-2 bg-[#663259] text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:bg-[#4a2340] active:scale-95"
                             >
                                 <Plus size={16} />
@@ -831,7 +838,7 @@ const CompanyDetail: React.FC = () => {
                                             <div className="flex items-center justify-end gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
                                                 {t.localId ? (
                                                     <>
-                                                        {t.source === 'transaction' && (
+                                                        {(t.source === 'transaction' || (t.source === 'invoice' && t.kind === 'purchase')) && (
                                                             <button
                                                                 onClick={() => openEditEntry(t)}
                                                                 title="Düzenle"
@@ -1385,6 +1392,7 @@ const CompanyDetail: React.FC = () => {
                 onClose={() => setShowPurchaseModal(false)}
                 companyId={company.id}
                 companyName={company.name}
+                editInvoiceId={editInvoiceId}
                 onSaved={async () => { await Promise.all([fetchCompanies(), loadLedger()]); }}
             />
         </div>

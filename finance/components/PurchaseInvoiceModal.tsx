@@ -4,13 +4,16 @@ import DatePicker from '../../../components/DatePicker';
 import { useEscapeKey } from '../../_shared/useEscapeKey';
 import { formatCurrency, generateId } from '../../_shared/helpers';
 import { useInvoiceStore } from '../stores/useInvoiceStore';
+import { invoiceService } from '../services/invoiceService';
 
 interface PurchaseInvoiceModalProps {
     isOpen: boolean;
     onClose: () => void;
     companyId: string;
     companyName: string;
-    /** Kayit sonrasi cari ekstresini/bakiyesini tazelemek icin. */
+    /** Dolu ise duzenleme modu: bu faturayi yukler ve gunceller. */
+    editInvoiceId?: string | null;
+    /** Kayit/guncelleme sonrasi cari ekstresini/bakiyesini tazelemek icin. */
     onSaved: () => void | Promise<void>;
 }
 
@@ -19,16 +22,34 @@ interface ItemRow {
     name: string;
     quantity: number;
     unit: string;
-    unitPrice: number;
+    unitPrice: string; // tr-TR formatli (ondalik ,) — hesapta parseAmount ile sayiya cevrilir
     vatRate: number;
 }
 
-const newRow = (): ItemRow => ({ id: generateId(), name: '', quantity: 1, unit: 'Adet', unitPrice: 0, vatRate: 20 });
+/** tr-TR formatli girisi sayiya cevir: "32.237,70" -> 32237.7 */
+const parseAmount = (s: string): number => {
+    if (!s) return 0;
+    const n = Number(s.replace(/\./g, '').replace(',', '.'));
+    return Number.isFinite(n) ? n : 0;
+};
+
+/** Girisi tr-TR binlik ayraciyla bicimle (yazarken): "32237,7" -> "32.237,7" */
+const formatAmountInput = (raw: string): string => {
+    let s = raw.replace(/[^\d,]/g, '');
+    const ci = s.indexOf(',');
+    if (ci !== -1) s = s.slice(0, ci + 1) + s.slice(ci + 1).replace(/,/g, '');
+    const [intP, decP] = s.split(',');
+    const intF = (intP || '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return decP !== undefined ? `${intF},${decP.slice(0, 2)}` : intF;
+};
+
+const newRow = (): ItemRow => ({ id: generateId(), name: '', quantity: 1, unit: 'Adet', unitPrice: '', vatRate: 0 });
 const fmt = (n: number) => formatCurrency(n);
 
-export default function PurchaseInvoiceModal({ isOpen, onClose, companyId, companyName, onSaved }: PurchaseInvoiceModalProps) {
+export default function PurchaseInvoiceModal({ isOpen, onClose, companyId, companyName, editInvoiceId, onSaved }: PurchaseInvoiceModalProps) {
     useEscapeKey(onClose, isOpen);
-    const { addInvoice, getNextInvoiceNo } = useInvoiceStore();
+    const { addInvoice, updateInvoice, getNextInvoiceNo } = useInvoiceStore();
+    const isEdit = !!editInvoiceId;
 
     const [invoiceNo, setInvoiceNo] = useState('');
     const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
@@ -36,16 +57,41 @@ export default function PurchaseInvoiceModal({ isOpen, onClose, companyId, compa
     const [description, setDescription] = useState('');
     const [items, setItems] = useState<ItemRow[]>([newRow()]);
     const [saving, setSaving] = useState(false);
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!isOpen) return;
-        setDate(new Date().toISOString().split('T')[0]);
-        setDueDate(''); setDescription(''); setItems([newRow()]); setError(null);
-        getNextInvoiceNo('purchase').then(setInvoiceNo).catch(() => setInvoiceNo(''));
-    }, [isOpen, getNextInvoiceNo]);
+        setError(null);
+        if (editInvoiceId) {
+            setLoading(true);
+            invoiceService.getById(editInvoiceId).then((inv) => {
+                if (!inv) { setError('Fatura bulunamadı.'); return; }
+                setInvoiceNo(inv.invoice_no || inv.invoice_number || '');
+                setDate(inv.date);
+                setDueDate(inv.due_date || '');
+                setDescription(inv.description || '');
+                setItems(
+                    inv.items.length
+                        ? inv.items.map((it) => ({
+                            id: generateId(),
+                            name: it.name || it.product_name || it.description || '',
+                            quantity: it.quantity || 1,
+                            unit: it.unit || 'Adet',
+                            unitPrice: formatAmountInput(String(it.unit_price ?? 0).replace('.', ',')),
+                            vatRate: it.vat_rate ?? it.tax_rate ?? 0,
+                        }))
+                        : [newRow()],
+                );
+            }).catch(() => setError('Fatura yüklenemedi.')).finally(() => setLoading(false));
+        } else {
+            setDate(new Date().toISOString().split('T')[0]);
+            setDueDate(''); setDescription(''); setItems([newRow()]);
+            getNextInvoiceNo('purchase').then(setInvoiceNo).catch(() => setInvoiceNo(''));
+        }
+    }, [isOpen, editInvoiceId, getNextInvoiceNo]);
 
-    const lineTotal = (it: ItemRow) => Math.round(it.quantity * it.unitPrice * 100) / 100;
+    const lineTotal = (it: ItemRow) => Math.round(it.quantity * parseAmount(it.unitPrice) * 100) / 100;
     const subtotal = useMemo(() => items.reduce((s, it) => s + lineTotal(it), 0), [items]);
     const totalVat = useMemo(() => items.reduce((s, it) => s + (lineTotal(it) * it.vatRate) / 100, 0), [items]);
     const grandTotal = Math.round((subtotal + totalVat) * 100) / 100;
@@ -59,38 +105,40 @@ export default function PurchaseInvoiceModal({ isOpen, onClose, companyId, compa
         const valid = items.filter((it) => it.name.trim());
         if (valid.length === 0) { setError('En az bir kalem (açıklama) girin.'); return; }
         setSaving(true); setError(null);
+        const data = {
+            invoice_no: invoiceNo,
+            invoice_type: 'toptan_alis',
+            direction: 'purchase' as const,
+            company_id: companyId,
+            company_name: companyName,
+            date,
+            due_date: dueDate || undefined,
+            description: description.trim() || undefined,
+            subtotal,
+            vat_total: totalVat,
+            grand_total: grandTotal,
+            payment_status: 'unpaid' as const,
+            status: 'active',
+        };
+        const itemPayload = valid.map((it) => ({
+            id: generateId(),
+            name: it.name.trim(),
+            quantity: it.quantity,
+            unit: it.unit,
+            unit_price: parseAmount(it.unitPrice),
+            vat_rate: it.vatRate,
+            total: lineTotal(it),
+        }));
         try {
-            await addInvoice(
-                {
-                    id: generateId(),
-                    invoice_no: invoiceNo,
-                    invoice_type: 'toptan_alis',
-                    direction: 'purchase',
-                    company_id: companyId,
-                    company_name: companyName,
-                    date,
-                    due_date: dueDate || undefined,
-                    description: description.trim() || undefined,
-                    subtotal,
-                    vat_total: totalVat,
-                    grand_total: grandTotal,
-                    payment_status: 'unpaid',
-                    status: 'active',
-                },
-                valid.map((it) => ({
-                    id: generateId(),
-                    name: it.name.trim(),
-                    quantity: it.quantity,
-                    unit: it.unit,
-                    unit_price: it.unitPrice,
-                    vat_rate: it.vatRate,
-                    total: lineTotal(it),
-                })),
-            );
+            if (editInvoiceId) {
+                await updateInvoice(editInvoiceId, data, itemPayload);
+            } else {
+                await addInvoice({ id: generateId(), ...data }, itemPayload);
+            }
             await onSaved();
             onClose();
         } catch {
-            setError('Alış kaydedilemedi. Lütfen tekrar deneyin veya oturumunuzu yenileyin.');
+            setError('Kaydedilemedi. Lütfen tekrar deneyin veya oturumunuzu yenileyin.');
         } finally {
             setSaving(false);
         }
@@ -109,7 +157,7 @@ export default function PurchaseInvoiceModal({ isOpen, onClose, companyId, compa
                             <FileText size={22} />
                         </div>
                         <div>
-                            <h3 className="text-lg font-black text-gray-800 tracking-tight">Alış Ekle</h3>
+                            <h3 className="text-lg font-black text-gray-800 tracking-tight">{isEdit ? 'Alışı Düzenle' : 'Alış Ekle'}</h3>
                             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{companyName}</p>
                         </div>
                     </div>
@@ -145,6 +193,11 @@ export default function PurchaseInvoiceModal({ isOpen, onClose, companyId, compa
                             <Plus size={14} /> Kalem Ekle
                         </button>
                     </div>
+                    {loading ? (
+                        <div className="flex items-center justify-center py-12 text-gray-400">
+                            <svg className="animate-spin h-6 w-6 text-[#663259]" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                        </div>
+                    ) : (
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
@@ -166,15 +219,16 @@ export default function PurchaseInvoiceModal({ isOpen, onClose, companyId, compa
                                         />
                                     </td>
                                     <td className="py-1.5 px-1">
-                                        <input type="number" value={it.quantity} min={0} onChange={(e) => updateItem(it.id, 'quantity', Number(e.target.value) || 0)}
+                                        <input type="text" inputMode="numeric" value={it.quantity} onChange={(e) => updateItem(it.id, 'quantity', Math.max(0, Math.floor(Number(e.target.value.replace(/\D/g, '')) || 0)))}
                                             className="w-full px-2 py-2 bg-gray-50 border border-gray-100 rounded-lg text-sm font-bold text-right text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#663259]/20 transition-all" />
                                     </td>
                                     <td className="py-1.5 px-1">
-                                        <input type="number" value={it.unitPrice} min={0} onChange={(e) => updateItem(it.id, 'unitPrice', Number(e.target.value) || 0)}
+                                        <input type="text" inputMode="decimal" value={it.unitPrice} placeholder="0,00"
+                                            onChange={(e) => updateItem(it.id, 'unitPrice', formatAmountInput(e.target.value))}
                                             className="w-full px-2 py-2 bg-gray-50 border border-gray-100 rounded-lg text-sm font-bold text-right text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#663259]/20 transition-all" />
                                     </td>
                                     <td className="py-1.5 px-1">
-                                        <input type="number" value={it.vatRate} min={0} onChange={(e) => updateItem(it.id, 'vatRate', Number(e.target.value) || 0)}
+                                        <input type="text" inputMode="numeric" value={it.vatRate} onChange={(e) => updateItem(it.id, 'vatRate', Math.max(0, Number(e.target.value.replace(/\D/g, '')) || 0))}
                                             className="w-full px-2 py-2 bg-gray-50 border border-gray-100 rounded-lg text-sm font-bold text-right text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#663259]/20 transition-all" />
                                     </td>
                                     <td className="py-1.5 px-1 text-right text-sm font-black text-gray-800 tabular-nums">{fmt(lineTotal(it))}</td>
@@ -187,6 +241,7 @@ export default function PurchaseInvoiceModal({ isOpen, onClose, companyId, compa
                             ))}
                         </tbody>
                     </table>
+                    )}
 
                     <div className="mt-4">
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Açıklama (ops.)</label>
@@ -205,8 +260,8 @@ export default function PurchaseInvoiceModal({ isOpen, onClose, companyId, compa
                     </div>
                     <div className="flex items-center gap-2.5 shrink-0">
                         <button onClick={onClose} className="px-5 py-3 bg-white text-gray-500 border border-gray-200 rounded-2xl hover:bg-gray-50 hover:text-gray-700 transition-all font-black text-xs uppercase tracking-widest">İptal</button>
-                        <button onClick={handleSave} disabled={saving} className="px-7 py-3 bg-[#663259] text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-[#663259]/20 hover:bg-[#4a2340] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                            {saving ? 'Kaydediliyor...' : 'Kaydet'}
+                        <button onClick={handleSave} disabled={saving || loading} className="px-7 py-3 bg-[#663259] text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-[#663259]/20 hover:bg-[#4a2340] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                            {saving ? 'Kaydediliyor...' : isEdit ? 'Güncelle' : 'Kaydet'}
                         </button>
                     </div>
                 </div>
