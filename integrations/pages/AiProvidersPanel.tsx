@@ -146,7 +146,7 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
                 typedKey ? { apiKey: typedKey, modelName } : { modelName },
             );
             if (!res.success) {
-                addToast('error', res.message);
+                addToast('error', res.message || 'Bağlantı doğrulanamadı.');
                 return;
             }
             // 2) Başarılıysa kaydet.
@@ -154,7 +154,7 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
                 apiKey: typedKey || undefined,
                 modelName,
             });
-            addToast('success', res.message);
+            addToast('success', res.message || 'API anahtarı doğrulandı ve kaydedildi.');
             // Rozeti ANINDA "Bağlı"ya çevir (list() tazelemesine bağlı kalmadan).
             if (typedKey) {
                 setAiMasked((prev) => ({ ...prev, [provider]: maskApiKey(typedKey) }));
