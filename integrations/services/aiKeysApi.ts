@@ -43,7 +43,8 @@ export interface AiKeyTestResult {
 
 export const aiKeysApi = {
     async list(): Promise<TenantAiKeyDto[]> {
-        const { data } = await api.get('/integrations/ai-keys');
+        // ÇAKIŞMASIZ yol: bare '/integrations/ai-keys' trendyol @Get(':id')'e gölgelenebiliyor.
+        const { data } = await api.get('/integrations/ai-keys/list');
         return unwrap<TenantAiKeyDto[]>(data) ?? [];
     },
 
