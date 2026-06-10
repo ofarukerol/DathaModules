@@ -13,8 +13,6 @@ import {
     Search,
     Plus,
     MoreHorizontal,
-    MessageSquare,
-    Paperclip,
     Clock,
     Trash2,
     Edit2,
@@ -494,14 +492,6 @@ const TodoBoard: React.FC<TodoBoardProps> = ({ currentUserName, getUsersFn }) =>
 
                                                 <div className="flex items-center justify-between pt-2">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="flex items-center gap-1 text-gray-400 font-bold text-[10px]">
-                                                            <MessageSquare size={13} />
-                                                            <span>3</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-1 text-gray-400 font-bold text-[10px]">
-                                                            <Paperclip size={13} />
-                                                            <span>1</span>
-                                                        </div>
                                                         {task.due_date && (
                                                             <div className={`flex items-center gap-1 font-bold text-[10px] ${new Date(task.due_date) < new Date() && task.status !== 'done' ? 'text-red-500' : 'text-gray-400'}`}>
                                                                 <Clock size={13} />

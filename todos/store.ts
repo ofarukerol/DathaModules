@@ -42,8 +42,13 @@ export const useTodoStore = create<TodoState>((set, get) => ({
         // Optimistic update
         set((state) => ({ todos: [newTodo, ...state.todos] }));
         try {
-            await todoService.addTodo(newTodo);
+            const saved = await todoService.addTodo(newTodo);
+            // Optimistik client id'yi backend'in verdigi id ile uzlastir. Aksi halde yeni
+            // gorevin uzerine yapilan atama/tarih/durum guncellemesi PATCH /todos/<clientId>
+            // cagirir; backend o id'yi bulamaz (gercek id farkli) -> 404 -> kaydolmaz.
+            set((state) => ({ todos: state.todos.map((t) => (t.id === id ? saved : t)) }));
             safeToast.success('Görev eklendi');
+            return saved.id;
         } catch (err: any) {
             set((state) => ({
                 error: err.message,

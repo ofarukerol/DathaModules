@@ -13,7 +13,6 @@ import {
     Trash2,
     Plus,
     ChevronDown,
-    Paperclip,
     ListTodo,
     MessageCircle,
     Send,
@@ -225,30 +224,6 @@ const EditTodoModal: React.FC<EditTodoModalProps> = ({ isOpen, onClose, todo, cu
                                     minHeight={160}
                                     accentColor="#663259"
                                 />
-                            </div>
-
-                            {/* Ekler Section */}
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2 text-gray-600 font-black text-sm uppercase tracking-wider">
-                                    <Paperclip size={16} />
-                                    Ekler
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center justify-between group hover:shadow-md transition-all cursor-pointer">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center font-bold text-[10px]">PDF</div>
-                                            <div>
-                                                <div className="text-xs font-bold text-gray-700">Gorev_Detaylari.pdf</div>
-                                                <div className="text-[10px] text-gray-400 font-medium">1.2 MB &bull; 2 saat önce</div>
-                                            </div>
-                                        </div>
-                                        <ChevronDown size={14} className="text-gray-300" />
-                                    </div>
-                                    <button type="button" className="flex items-center justify-center gap-2 py-4 border-2 border-dashed border-gray-100 rounded-[24px] text-gray-400 hover:text-[#F97171] hover:border-[#F97171]/30 hover:bg-gray-50 transition-all font-bold text-sm">
-                                        <Plus size={20} />
-                                        Dosya Ekle
-                                    </button>
-                                </div>
                             </div>
 
                             {/* Yorumlar Section */}
