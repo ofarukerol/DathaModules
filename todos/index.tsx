@@ -39,6 +39,32 @@ const columnConfig: Record<string, { label: string; dotColor: string }> = {
     done: { label: 'Tamamlananlar', dotColor: 'bg-emerald-400' },
 };
 
+// Atanan avatarlari: backend assignee yalniz { id, name } dondurur (foto yok).
+// Rastgele yabanci foto (eski i.pravatar.cc) YERINE isimden turetilen deterministik
+// bas-harf avatari — app geneliyle ayni palet (Employees getAvatarColor).
+const AVATAR_COLORS = [
+    { bg: 'bg-blue-100', text: 'text-blue-600' },
+    { bg: 'bg-orange-100', text: 'text-orange-600' },
+    { bg: 'bg-purple-100', text: 'text-purple-600' },
+    { bg: 'bg-teal-100', text: 'text-teal-600' },
+    { bg: 'bg-indigo-100', text: 'text-indigo-600' },
+    { bg: 'bg-pink-100', text: 'text-pink-600' },
+    { bg: 'bg-emerald-100', text: 'text-emerald-600' },
+    { bg: 'bg-amber-100', text: 'text-amber-600' },
+];
+
+function avatarFor(name: string | null, id: string): { initials: string; bg: string; text: string } {
+    const label = (name ?? '').trim();
+    const initials = label
+        ? label.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('')
+        : '?';
+    const seed = label || id;
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+    const color = AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+    return { initials, bg: color.bg, text: color.text };
+}
+
 const listTabs: { id: TabFilter; label: string; activeColor: string }[] = [
     { id: 'all', label: 'Tümü', activeColor: 'bg-[#663259] text-white' },
     { id: 'todo', label: 'Yapılacak', activeColor: 'bg-gray-700 text-white' },
@@ -488,15 +514,18 @@ const TodoBoard: React.FC<TodoBoardProps> = ({ currentUserName, getUsersFn }) =>
                                                         {(task.assignees && task.assignees.length > 0
                                                             ? task.assignees.slice(0, 3)
                                                             : [{ id: task.id, name: task.assignee || null }]
-                                                        ).map((a) => (
-                                                            <img
-                                                                key={a.id}
-                                                                src={`https://i.pravatar.cc/100?u=${a.id}`}
-                                                                alt={a.name ?? 'User'}
-                                                                title={a.name ?? undefined}
-                                                                className="w-6 h-6 rounded-full border-2 border-white object-cover shadow-sm bg-gray-100"
-                                                            />
-                                                        ))}
+                                                        ).map((a) => {
+                                                            const av = avatarFor(a.name, a.id);
+                                                            return (
+                                                                <div
+                                                                    key={a.id}
+                                                                    title={a.name ?? undefined}
+                                                                    className={`w-6 h-6 rounded-full border-2 border-white ${av.bg} ${av.text} text-[9px] font-bold flex items-center justify-center shadow-sm`}
+                                                                >
+                                                                    {av.initials}
+                                                                </div>
+                                                            );
+                                                        })}
                                                         {task.assignees && task.assignees.length > 3 && (
                                                             <div className="w-6 h-6 rounded-full border-2 border-white bg-gray-200 text-gray-600 text-[9px] font-bold flex items-center justify-center shadow-sm">
                                                                 +{task.assignees.length - 3}

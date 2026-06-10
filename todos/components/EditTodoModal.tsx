@@ -3,6 +3,10 @@ import { useEscapeKey } from '../../_shared/useEscapeKey';
 import { useTodoStore } from '../store';
 import { Todo, TodoComment } from '../types';
 import { todoService } from '../service';
+import { reminderService } from '../reminderService';
+import { useReminderStore } from '../reminderStore';
+import type { ReminderSeverity } from '../reminderTypes';
+import { toast } from '../toastStore';
 import {
     X,
     AlignLeft,
@@ -12,7 +16,10 @@ import {
     Paperclip,
     ListTodo,
     MessageCircle,
-    Send
+    Send,
+    Bell,
+    Info,
+    AlertTriangle
 } from 'lucide-react';
 import RichTextEditor from '@/components/RichTextEditor';
 import DatePicker from './DatePicker';
@@ -45,6 +52,8 @@ const EditTodoModal: React.FC<EditTodoModalProps> = ({ isOpen, onClose, todo, cu
     const [dueDate, setDueDate] = useState(todo.due_date || '');
     const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [asReminder, setAsReminder] = useState(false);
+    const [severity, setSeverity] = useState<ReminderSeverity>('INFO');
     const [users, setUsers] = useState<DBUser[]>([]);
     const [showUserDropdown, setShowUserDropdown] = useState(false);
     const [showStatusDropdown, setShowStatusDropdown] = useState(false);
@@ -116,9 +125,36 @@ const EditTodoModal: React.FC<EditTodoModalProps> = ({ isOpen, onClose, todo, cu
 
     if (!isOpen) return null;
 
+    // Gorevi hatirlatmaya cevir: atananlara (yoksa kendine) DathaStaff'a giden bir
+    // reminder olustur, ardindan gorevi soft-delete et. Hatirlatma altyapisi (backend
+    // reminder modulu + Staff RemindersSection + push) bunu otomatik gosterir.
+    const handleConvertToReminder = async () => {
+        try {
+            await reminderService.create({
+                title: title.trim(),
+                severity,
+                recipientIds: assignees.map((a) => a.id).filter(Boolean),
+            });
+            await todoService.deleteTodo(todo.id);
+            await Promise.all([
+                useReminderStore.getState().fetchReminders(),
+                useTodoStore.getState().fetchTodos(),
+            ]);
+            toast.success('Hatırlatmaya çevrildi');
+            onClose();
+        } catch {
+            toast.error('Hatırlatmaya çevrilemedi');
+        }
+    };
+
     const handleSubmit = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
         if (!title.trim()) return;
+
+        if (asReminder) {
+            await handleConvertToReminder();
+            return;
+        }
 
         await updateTodo({
             ...todo,
@@ -297,6 +333,54 @@ const EditTodoModal: React.FC<EditTodoModalProps> = ({ isOpen, onClose, todo, cu
                         {/* Right Side: Attributes */}
                         <div className="w-full lg:w-[320px] space-y-8">
                             <div className="space-y-6">
+                                {/* Tür: Görev / Hatırlatma */}
+                                <div>
+                                    <label className="block text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3">Tür</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setAsReminder(false)}
+                                            className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl font-bold text-sm transition-all ${!asReminder ? 'bg-[#663259] text-white shadow-md' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
+                                        >
+                                            <ListTodo size={16} />
+                                            Görev
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setAsReminder(true)}
+                                            className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl font-bold text-sm transition-all ${asReminder ? 'bg-amber-500 text-white shadow-md' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
+                                        >
+                                            <Bell size={16} />
+                                            Hatırlatma
+                                        </button>
+                                    </div>
+                                    {asReminder && (
+                                        <div className="mt-3 space-y-3">
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSeverity('INFO')}
+                                                    className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs transition-all ${severity === 'INFO' ? 'bg-blue-100 text-blue-600' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
+                                                >
+                                                    <Info size={14} />
+                                                    Bilgi
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSeverity('WARNING')}
+                                                    className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs transition-all ${severity === 'WARNING' ? 'bg-red-100 text-red-600' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
+                                                >
+                                                    <AlertTriangle size={14} />
+                                                    Uyarı
+                                                </button>
+                                            </div>
+                                            <p className="text-[11px] text-gray-400 font-medium leading-relaxed">
+                                                Kaydedince {assignees.length > 0 ? 'atananlara' : 'size'} DathaStaff'ta hatırlatma olarak gönderilir ve bu görev kaldırılır.
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+
                                 {/* Durum */}
                                 <div className="relative">
                                     <label className="block text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3">Durum</label>
@@ -429,9 +513,9 @@ const EditTodoModal: React.FC<EditTodoModalProps> = ({ isOpen, onClose, todo, cu
                         </button>
                         <button
                             onClick={() => handleSubmit()}
-                            className="px-10 py-3 rounded-2xl bg-[#F97171] text-white font-black hover:bg-[#E05A5A] shadow-xl shadow-[#F97171]/30 transition-all transform active:scale-95 text-sm uppercase tracking-widest"
+                            className={`px-10 py-3 rounded-2xl text-white font-black shadow-xl transition-all transform active:scale-95 text-sm uppercase tracking-widest ${asReminder ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/30' : 'bg-[#F97171] hover:bg-[#E05A5A] shadow-[#F97171]/30'}`}
                         >
-                            Değişiklikleri Kaydet
+                            {asReminder ? 'Hatırlatmaya Çevir' : 'Değişiklikleri Kaydet'}
                         </button>
                     </div>
                 </div>
