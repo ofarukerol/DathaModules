@@ -1,7 +1,18 @@
+import axios from 'axios';
 import { getReadyDb, isTauri } from './db';
 import { Todo, Tag, TodoComment } from './types';
 import { enqueueSync } from '../../utils/syncQueue';
 import { api } from '../_shared/api';
+
+/**
+ * Online iken sunucudan donen GERCEK HTTP hatasi (4xx/5xx — response var) ile
+ * ag/timeout hatasini (response yok) ayirt eder. HTTP hatasi offline mantigina
+ * DUSULMEMELI: aksi halde sunucu reddi (orn. 403/404) sessizce yutulur, kullanici
+ * islemin basarili oldugunu sanir ve refresh'te degisiklik geri doner.
+ */
+function isHttpResponseError(e: unknown): boolean {
+    return axios.isAxiosError(e) && !!e.response;
+}
 
 // ─── Backend <-> UI eslestirme ───
 type ApiStatus = 'TODO' | 'IN_PROGRESS' | 'DONE';
@@ -103,7 +114,8 @@ export const todoService = {
                 lsSet(CACHE_KEY, [saved, ...cache.filter((t) => t.id !== saved.id && t.id !== todo.id)]);
                 return saved;
             } catch (e) {
-                // online deneme basarisiz → offline mantik
+                if (isHttpResponseError(e)) throw e;
+                // ag hatasi → offline mantik (kuyruga al)
             }
         }
         // Offline / online basarisiz
@@ -144,7 +156,10 @@ export const todoService = {
                 const cache = lsGet<Todo[]>(CACHE_KEY, []);
                 lsSet(CACHE_KEY, cache.map((t) => (t.id === id ? { ...t, status: status as Todo['status'] } : t)));
                 return;
-            } catch { /* offline mantigi */ }
+            } catch (e) {
+                if (isHttpResponseError(e)) throw e;
+                /* ag hatasi → offline mantigi */
+            }
         }
         const cache = lsGet<Todo[]>(CACHE_KEY, []);
         lsSet(CACHE_KEY, cache.map((t) => (t.id === id ? { ...t, status: status as Todo['status'] } : t)));
@@ -175,7 +190,10 @@ export const todoService = {
                 const cache = lsGet<Todo[]>(CACHE_KEY, []);
                 lsSet(CACHE_KEY, cache.map((t) => (t.id === saved.id ? saved : t)));
                 return;
-            } catch { /* offline mantigi */ }
+            } catch (e) {
+                if (isHttpResponseError(e)) throw e;
+                /* ag hatasi → offline mantigi */
+            }
         }
         const cache = lsGet<Todo[]>(CACHE_KEY, []);
         lsSet(CACHE_KEY, cache.map((t) => (t.id === todo.id ? todo : t)));
@@ -209,7 +227,10 @@ export const todoService = {
                 const cache = lsGet<Todo[]>(CACHE_KEY, []);
                 lsSet(CACHE_KEY, cache.filter((t) => t.id !== id));
                 return;
-            } catch { /* offline mantigi */ }
+            } catch (e) {
+                if (isHttpResponseError(e)) throw e;
+                /* ag hatasi → offline mantigi */
+            }
         }
         const cache = lsGet<Todo[]>(CACHE_KEY, []);
         lsSet(CACHE_KEY, cache.filter((t) => t.id !== id));
