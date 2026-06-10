@@ -28,6 +28,13 @@ function backendErrorMessage(err: unknown, fallback: string): string {
     return err instanceof Error ? err.message : fallback;
 }
 
+/** Anahtarı maskeler (backend ile aynı biçim: ilk4****son4). Rozeti anında güncellemek için. */
+function maskApiKey(key: string): string {
+    const k = key.trim();
+    if (k.length <= 8) return '****';
+    return `${k.slice(0, 4)}****${k.slice(-4)}`;
+}
+
 interface AiProvidersPanelProps {
     /** Ayarlar paneli içinde gömülü mü (absolute layout) */
     embedded?: boolean;
@@ -148,6 +155,12 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
                 modelName,
             });
             addToast('success', res.message);
+            // Rozeti ANINDA "Bağlı"ya çevir (list() tazelemesine bağlı kalmadan).
+            if (typedKey) {
+                setAiMasked((prev) => ({ ...prev, [provider]: maskApiKey(typedKey) }));
+                setAiNewKeys((prev) => ({ ...prev, [provider]: '' }));
+                setShowKey((prev) => ({ ...prev, [provider]: false }));
+            }
             // 3) Maske + canlı model listesini tazele (best-effort).
             try {
                 const fresh = await aiKeysApi.list();
