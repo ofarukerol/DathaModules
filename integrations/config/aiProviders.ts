@@ -27,6 +27,8 @@ export interface AiProviderMeta {
     recommendedRank?: number;
     /** Karta gösterilecek kısa öneri açıklaması (ücretsiz/kota/dil notu). */
     recommendationNote?: string;
+    /** true ise sağlayıcı ücretlidir: hesaba kredi/bakiye yüklenmeden çalışmaz (uyarı gösterilir). */
+    requiresCredit?: boolean;
 }
 
 // Sıralama = önerilen kullanım sırası. İlk 3 (Gemini → Groq → OpenAI) önerilen settir.
@@ -64,6 +66,7 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
         apiKeyUrl: 'https://platform.openai.com/api-keys',
         recommendedRank: 3,
         recommendationNote: 'Uygun fiyatlı; bilgi tabanı (embedding) her zaman OpenAI kullandığı için bir OpenAI anahtarı önerilir.',
+        requiresCredit: true,
     },
     {
         key: 'DEEPSEEK',
@@ -73,6 +76,7 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
         defaultModel: 'deepseek-chat',
         models: ['deepseek-chat', 'deepseek-reasoner'],
         apiKeyUrl: 'https://platform.deepseek.com/api_keys',
+        requiresCredit: true,
     },
     {
         key: 'MINIMAX',
@@ -82,6 +86,7 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
         defaultModel: 'MiniMax-Text-01',
         models: ['MiniMax-Text-01', 'abab6.5s-chat', 'abab6.5-chat'],
         apiKeyUrl: 'https://platform.minimax.io/user-center/basic-information/interface-key',
+        requiresCredit: true,
     },
     {
         key: 'XAI',
@@ -91,6 +96,7 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
         defaultModel: 'grok-4.3',
         models: ['grok-4.3', 'grok-4', 'grok-3'],
         apiKeyUrl: 'https://console.x.ai',
+        requiresCredit: true,
     },
 ];
 

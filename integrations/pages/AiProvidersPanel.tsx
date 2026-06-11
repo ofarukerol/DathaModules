@@ -327,6 +327,17 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
                                 API anahtarını buradan al
                             </a>
 
+                            {/* Ücretli sağlayıcı uyarısı — kredi yüklenmeden çalışmaz */}
+                            {p.requiresCredit && (
+                                <div className="flex items-start gap-1.5 mt-2 rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1.5">
+                                    <span className="material-symbols-outlined text-[15px] text-amber-600 mt-px">info</span>
+                                    <p className="text-[11px] text-amber-700 leading-snug">
+                                        Ücretli sağlayıcı — hesabınıza <strong>kredi/bakiye yüklemeden</strong> bu
+                                        sağlayıcı çalışmaz.
+                                    </p>
+                                </div>
+                            )}
+
                             {/* Ayraç */}
                             <div className="h-px bg-gray-100 my-4" />
 
