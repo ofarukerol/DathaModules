@@ -88,8 +88,8 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
         label: 'xAI (Grok)',
         icon: 'rocket_launch',
         keyPlaceholder: 'xai-...',
-        defaultModel: 'grok-3',
-        models: ['grok-3', 'grok-3-mini', 'grok-2-latest', 'grok-2-vision-1212'],
+        defaultModel: 'grok-4.3',
+        models: ['grok-4.3', 'grok-4', 'grok-3'],
         apiKeyUrl: 'https://console.x.ai',
     },
 ];
