@@ -221,6 +221,24 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
                     kendi ayarından seçilir.
                 </p>
 
+                {/* Önerilen sağlayıcı sırası — bilgilendirme */}
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 mb-5">
+                    <div className="flex items-center gap-2 mb-1.5">
+                        <span className="material-symbols-outlined text-amber-600 text-[20px]">tips_and_updates</span>
+                        <h4 className="font-bold text-sm text-amber-800">Önerilen sağlayıcı sırası</h4>
+                    </div>
+                    <p className="text-[13px] text-amber-700 leading-relaxed">
+                        Ücretsiz kota, Türkçe kalitesi ve kararlılığa göre önerimiz:
+                        <strong> 1) Google Gemini</strong> (ücretsiz, en iyi Türkçe),
+                        <strong> 2) Groq</strong> (ücretsiz, çok hızlı),
+                        <strong> 3) OpenAI</strong> (uygun fiyatlı).
+                        <br />
+                        <span className="font-semibold">Not:</span> Bilgi tabanı (embedding) her zaman OpenAI
+                        kullanır — RAG'in çalışması için bir OpenAI anahtarı önerilir. Botun kullanacağı
+                        sağlayıcıyı WhatsApp ayarlarından seçersiniz.
+                    </p>
+                </div>
+
                 {AI_PROVIDERS.map((p) => {
                     const connected = !!aiMasked[p.key];
                     const canUse = !!aiNewKeys[p.key].trim() || connected;
@@ -243,7 +261,17 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
                                         <span className="material-symbols-outlined text-[22px]">{p.icon}</span>
                                     </div>
                                     <div className="min-w-0">
-                                        <h4 className="font-bold text-sm text-gray-800 leading-tight">{p.label}</h4>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <h4 className="font-bold text-sm text-gray-800 leading-tight">{p.label}</h4>
+                                            {p.recommendedRank && (
+                                                <span className="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                                                    {p.recommendedRank}. öncelik{p.recommendedRank === 1 ? ' · önerilen' : ''}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {p.recommendationNote && (
+                                            <p className="text-[11px] text-gray-500 mt-0.5 leading-snug">{p.recommendationNote}</p>
+                                        )}
                                         <span className="text-[11px] text-gray-400 font-mono">
                                             {connected ? aiMasked[p.key] : 'Anahtar girilmedi'}
                                         </span>

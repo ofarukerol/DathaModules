@@ -20,7 +20,7 @@ function unwrap<T>(payload: T | ApiEnvelope<T>): T {
 
 // Backend AiProvider enum ile uyumlu (tenant-ai-key.controller.ts ALLOWED listesi).
 // Meta verileri (label, ikon, model, API URL): config/aiProviders.ts
-export type AiProviderKey = 'OPENAI' | 'GOOGLE' | 'DEEPSEEK' | 'MINIMAX' | 'XAI';
+export type AiProviderKey = 'OPENAI' | 'GOOGLE' | 'GROQ' | 'DEEPSEEK' | 'MINIMAX' | 'XAI';
 
 export interface TenantAiKeyDto {
     provider: AiProviderKey;

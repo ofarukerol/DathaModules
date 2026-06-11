@@ -23,26 +23,47 @@ export interface AiProviderMeta {
     models: string[];
     /** Kullanıcının API anahtarını alabileceği sayfa. */
     apiKeyUrl: string;
+    /** Önerilen kullanım sırası (1=birincil, 2=yedek, 3=...). Yoksa öneri rozeti gösterilmez. */
+    recommendedRank?: number;
+    /** Karta gösterilecek kısa öneri açıklaması (ücretsiz/kota/dil notu). */
+    recommendationNote?: string;
 }
 
+// Sıralama = önerilen kullanım sırası. İlk 3 (Gemini → Groq → OpenAI) önerilen settir.
+// Default modeller canlı olarak doğrulandı (gemini-2.5-flash / llama-3.3-70b / gpt-4o-mini).
 export const AI_PROVIDERS: AiProviderMeta[] = [
-    {
-        key: 'OPENAI',
-        label: 'OpenAI (GPT)',
-        icon: 'smart_toy',
-        keyPlaceholder: 'sk-...',
-        defaultModel: 'gpt-5.4-mini',
-        models: ['gpt-5.5', 'gpt-5.5-pro', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5.1', 'gpt-5'],
-        apiKeyUrl: 'https://platform.openai.com/api-keys',
-    },
     {
         key: 'GOOGLE',
         label: 'Google (Gemini)',
         icon: 'auto_awesome',
         keyPlaceholder: 'AIza...',
-        defaultModel: 'gemini-3.5-flash',
-        models: ['gemini-3.5-flash', 'gemini-3.5-pro', 'gemini-3.1-pro', 'gemini-3.1-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-pro', 'gemini-2.5-flash'],
+        defaultModel: 'gemini-2.5-flash',
+        models: ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-3.1-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-pro', 'gemini-3.1-pro'],
         apiKeyUrl: 'https://aistudio.google.com/app/apikey',
+        recommendedRank: 1,
+        recommendationNote: 'Ücretsiz kota + en iyi Türkçe — önerilen birincil sağlayıcı.',
+    },
+    {
+        key: 'GROQ',
+        label: 'Groq (Llama)',
+        icon: 'bolt',
+        keyPlaceholder: 'gsk_...',
+        defaultModel: 'llama-3.3-70b-versatile',
+        models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'gemma2-9b-it'],
+        apiKeyUrl: 'https://console.groq.com/keys',
+        recommendedRank: 2,
+        recommendationNote: 'Ücretsiz + çok hızlı (kartsız anahtar) — önerilen yedek.',
+    },
+    {
+        key: 'OPENAI',
+        label: 'OpenAI (GPT)',
+        icon: 'smart_toy',
+        keyPlaceholder: 'sk-...',
+        defaultModel: 'gpt-4o-mini',
+        models: ['gpt-4o-mini', 'gpt-4o', 'gpt-5.4-mini', 'gpt-5.4', 'gpt-5.5', 'gpt-5'],
+        apiKeyUrl: 'https://platform.openai.com/api-keys',
+        recommendedRank: 3,
+        recommendationNote: 'Uygun fiyatlı; bilgi tabanı (embedding) her zaman OpenAI kullandığı için bir OpenAI anahtarı önerilir.',
     },
     {
         key: 'DEEPSEEK',
