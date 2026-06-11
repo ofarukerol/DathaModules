@@ -81,7 +81,7 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
         keyPlaceholder: 'API anahtarı',
         defaultModel: 'MiniMax-Text-01',
         models: ['MiniMax-Text-01', 'abab6.5s-chat', 'abab6.5-chat'],
-        apiKeyUrl: 'https://platform.minimaxi.com/user-center/basic-information/interface-key',
+        apiKeyUrl: 'https://platform.minimax.io/user-center/basic-information/interface-key',
     },
     {
         key: 'XAI',
