@@ -233,9 +233,9 @@ export default function AiProvidersPanel({ embedded = false }: AiProvidersPanelP
                         <strong> 2) Groq</strong> (ücretsiz, çok hızlı),
                         <strong> 3) OpenAI</strong> (uygun fiyatlı).
                         <br />
-                        <span className="font-semibold">Not:</span> Bilgi tabanı (embedding) her zaman OpenAI
-                        kullanır — RAG'in çalışması için bir OpenAI anahtarı önerilir. Botun kullanacağı
-                        sağlayıcıyı WhatsApp ayarlarından seçersiniz.
+                        <span className="font-semibold">Not:</span> Bilgi tabanı (embedding) Gemini
+                        kullanır — RAG'in çalışması için bir <strong>Google (Gemini)</strong> anahtarı önerilir
+                        (ücretsiz kota). Botun kullanacağı sağlayıcıyı WhatsApp ayarlarından seçersiniz.
                     </p>
                 </div>
 

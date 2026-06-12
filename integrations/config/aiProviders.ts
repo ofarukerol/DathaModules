@@ -43,7 +43,7 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
         models: ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-3.1-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-pro', 'gemini-3.1-pro'],
         apiKeyUrl: 'https://aistudio.google.com/app/apikey',
         recommendedRank: 1,
-        recommendationNote: 'Ücretsiz kota + en iyi Türkçe — önerilen birincil sağlayıcı.',
+        recommendationNote: 'Ücretsiz kota + en iyi Türkçe — önerilen birincil sağlayıcı. Bilgi tabanı (RAG embedding) da bunu kullanır.',
     },
     {
         key: 'GROQ',
@@ -65,7 +65,7 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
         models: ['gpt-4o-mini', 'gpt-4o', 'gpt-5.4-mini', 'gpt-5.4', 'gpt-5.5', 'gpt-5'],
         apiKeyUrl: 'https://platform.openai.com/api-keys',
         recommendedRank: 3,
-        recommendationNote: 'Uygun fiyatlı; bilgi tabanı (embedding) her zaman OpenAI kullandığı için bir OpenAI anahtarı önerilir.',
+        recommendationNote: 'Uygun fiyatlı sohbet modelleri.',
         requiresCredit: true,
     },
     {
