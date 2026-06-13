@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { X, Plus, Trash2, Wallet, History, Save, ChevronLeft } from 'lucide-react';
+import { X, Plus, Trash2, Wallet, History, Save, ChevronLeft, Pencil, AlertTriangle } from 'lucide-react';
 import DatePicker from '../../../components/DatePicker';
 import { useEscapeKey } from '../../_shared/useEscapeKey';
 import { formatCurrency, generateId } from '../../_shared/helpers';
@@ -14,6 +14,15 @@ interface PaymentListModalProps {
 }
 
 interface ManualRow { id: string; name: string; amount: string; }
+
+/** Gecmis detay duzenleme satiri (cari veya manuel). */
+interface EditRow {
+    id: string;
+    companyId: string | null;
+    name: string; // cari adi (sabit) veya manuel ad (editlenebilir)
+    balanceSnapshot: number; // lira — kayittaki borc
+    amount: string; // tr-TR formatli girdi
+}
 
 const fmt = (n: number) => formatCurrency(n);
 
@@ -34,6 +43,9 @@ const formatAmountInput = (raw: string): string => {
     return decP !== undefined ? `${intF},${decP.slice(0, 2)}` : intF;
 };
 
+/** Sayiyi (lira) duzenleme girdisi formatina cevir: 167743.67 -> "167.743,67" */
+const numToInput = (n: number): string => formatAmountInput(n.toFixed(2).replace('.', ','));
+
 export default function PaymentListModal({ isOpen, onClose, companies }: PaymentListModalProps) {
     useEscapeKey(onClose, isOpen);
 
@@ -53,6 +65,87 @@ export default function PaymentListModal({ isOpen, onClose, companies }: Payment
     const [historyLoading, setHistoryLoading] = useState(false);
     const [detail, setDetail] = useState<PaymentListDetail | null>(null);
     const [detailLoading, setDetailLoading] = useState(false);
+
+    // Gecmis detay duzenleme / silme
+    const [editing, setEditing] = useState(false);
+    const [editTitle, setEditTitle] = useState('');
+    const [editDate, setEditDate] = useState('');
+    const [editTotal, setEditTotal] = useState('');
+    const [editItems, setEditItems] = useState<EditRow[]>([]);
+    const [savingEdit, setSavingEdit] = useState(false);
+    const [editError, setEditError] = useState<string | null>(null);
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+
+    const editAllocated = useMemo(() => {
+        const sum = editItems.reduce((s, r) => s + parseAmount(r.amount), 0);
+        return Math.round(sum * 100) / 100;
+    }, [editItems]);
+    const editTotalNum = parseAmount(editTotal);
+    const editRemaining = Math.round((editTotalNum - editAllocated) * 100) / 100;
+
+    const closeDetail = () => {
+        setDetail(null);
+        setEditing(false);
+        setConfirmDelete(false);
+        setEditError(null);
+    };
+
+    const startEdit = () => {
+        if (!detail) return;
+        setEditTitle(detail.title ?? '');
+        setEditDate(detail.paymentDate);
+        setEditTotal(numToInput(detail.totalAmount));
+        setEditItems(
+            detail.items.map((it) => ({
+                id: it.id,
+                companyId: it.companyId,
+                name: it.companyName || it.manualName || '',
+                balanceSnapshot: it.balanceSnapshot,
+                amount: numToInput(it.amount),
+            })),
+        );
+        setEditError(null);
+        setConfirmDelete(false);
+        setEditing(true);
+    };
+
+    const handleUpdate = async () => {
+        if (!detail || savingEdit) return;
+        if (editTotalNum <= 0) { setEditError('Geçerli bir toplam tutar girin.'); return; }
+        const items = editItems
+            .filter((r) => (r.companyId ? parseAmount(r.amount) > 0 : r.name.trim() && parseAmount(r.amount) > 0))
+            .map((r) =>
+                r.companyId
+                    ? { companyId: r.companyId, balanceSnapshot: r.balanceSnapshot, amount: parseAmount(r.amount) }
+                    : { manualName: r.name.trim(), amount: parseAmount(r.amount) },
+            );
+        if (items.length === 0) { setEditError('En az bir satıra tutar girin.'); return; }
+        setSavingEdit(true); setEditError(null);
+        try {
+            const updated = await paymentListService.update(detail.id, {
+                title: editTitle, paymentDate: editDate, totalAmount: editTotalNum, items,
+            });
+            if (updated) setDetail(updated);
+            setEditing(false);
+            await loadHistory();
+        } catch {
+            setEditError('Liste güncellenemedi. Lütfen tekrar deneyin.');
+        } finally { setSavingEdit(false); }
+    };
+
+    const handleDelete = async () => {
+        if (!detail || deleting) return;
+        setDeleting(true); setEditError(null);
+        try {
+            await paymentListService.remove(detail.id);
+            closeDetail();
+            await loadHistory();
+        } catch {
+            setEditError('Liste silinemedi. Lütfen tekrar deneyin.');
+            setDeleting(false);
+        }
+    };
 
     // Borclu cariler (bakiye < 0), borcu buyukten kucuge
     const borcluCompanies = useMemo(
@@ -120,7 +213,7 @@ export default function PaymentListModal({ isOpen, onClose, companies }: Payment
 
     const tabBtn = (key: 'new' | 'history', label: string, Icon: typeof Wallet) => (
         <button
-            onClick={() => { setTab(key); setDetail(null); }}
+            onClick={() => { setTab(key); closeDetail(); }}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${tab === key ? 'bg-[#663259] text-white shadow-sm' : 'text-gray-500 hover:bg-gray-100'}`}
         >
             <Icon size={16} />{label}
@@ -269,40 +362,159 @@ export default function PaymentListModal({ isOpen, onClose, companies }: Payment
                     <div className="flex-1 overflow-y-auto custom-scrollbar px-7 py-4">
                         {detail ? (
                             <div>
-                                <button onClick={() => setDetail(null)} className="flex items-center gap-1.5 text-sm font-bold text-gray-500 hover:text-[#663259] mb-4 transition-colors">
-                                    <ChevronLeft size={16} /> Listeye dön
-                                </button>
-                                <div className="flex items-center justify-between mb-4 p-4 bg-gray-50 rounded-2xl">
-                                    <div>
-                                        <h4 className="text-base font-black text-gray-800">{detail.title || 'Ödeme Listesi'}</h4>
-                                        <p className="text-xs text-gray-400 font-bold">{detail.paymentDate}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Toplam / Dağıtılan</p>
-                                        <p className="text-lg font-black text-[#663259]">{fmt(detail.totalAmount)} <span className="text-gray-300">/</span> {fmt(detail.allocatedAmount)}</p>
-                                    </div>
+                                <div className="flex items-center justify-between mb-4">
+                                    <button onClick={closeDetail} className="flex items-center gap-1.5 text-sm font-bold text-gray-500 hover:text-[#663259] transition-colors">
+                                        <ChevronLeft size={16} /> Listeye dön
+                                    </button>
+                                    {!editing ? (
+                                        <div className="flex items-center gap-2">
+                                            <button onClick={startEdit} className="flex items-center gap-1.5 px-3.5 py-2 bg-gray-50 hover:bg-[#663259] hover:text-white border border-gray-100 rounded-xl text-xs font-bold text-gray-600 transition-all">
+                                                <Pencil size={14} /> Düzenle
+                                            </button>
+                                            <button onClick={() => setConfirmDelete(true)} className="flex items-center gap-1.5 px-3.5 py-2 bg-red-50 hover:bg-red-500 hover:text-white border border-red-100 rounded-xl text-xs font-bold text-red-500 transition-all">
+                                                <Trash2 size={14} /> Listeyi Sil
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2">
+                                            <button onClick={() => { setEditing(false); setEditError(null); }} disabled={savingEdit} className="px-3.5 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-100 rounded-xl text-xs font-bold text-gray-500 transition-all disabled:opacity-50">
+                                                Vazgeç
+                                            </button>
+                                            <button onClick={handleUpdate} disabled={savingEdit} className="flex items-center gap-1.5 px-4 py-2 bg-[#663259] text-white rounded-xl text-xs font-bold shadow-sm hover:bg-[#4a2340] transition-all disabled:opacity-50">
+                                                <Save size={14} /> {savingEdit ? 'Kaydediliyor...' : 'Kaydet'}
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
+
+                                {/* Silme onayi */}
+                                {confirmDelete && (
+                                    <div className="mb-4 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center justify-between gap-4">
+                                        <div className="flex items-center gap-2.5 text-sm font-bold text-red-600">
+                                            <AlertTriangle size={18} /> Bu ödeme listesi silinsin mi? Bu işlem listeyi geçmişten kaldırır.
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <button onClick={() => setConfirmDelete(false)} disabled={deleting} className="px-3.5 py-2 bg-white border border-gray-100 rounded-xl text-xs font-bold text-gray-500 transition-all disabled:opacity-50">
+                                                Vazgeç
+                                            </button>
+                                            <button onClick={handleDelete} disabled={deleting} className="flex items-center gap-1.5 px-4 py-2 bg-red-500 text-white rounded-xl text-xs font-bold hover:bg-red-600 transition-all disabled:opacity-50">
+                                                <Trash2 size={14} /> {deleting ? 'Siliniyor...' : 'Evet, Sil'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Ozet / duzenleme baslik alani */}
+                                {!editing ? (
+                                    <div className="flex items-center justify-between mb-4 p-4 bg-gray-50 rounded-2xl">
+                                        <div>
+                                            <h4 className="text-base font-black text-gray-800">{detail.title || 'Ödeme Listesi'}</h4>
+                                            <p className="text-xs text-gray-400 font-bold">{detail.paymentDate}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Toplam / Dağıtılan</p>
+                                            <p className="text-lg font-black text-[#663259]">{fmt(detail.totalAmount)} <span className="text-gray-300">/</span> {fmt(detail.allocatedAmount)}</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="mb-4 p-4 bg-gray-50 rounded-2xl grid grid-cols-1 md:grid-cols-4 gap-3">
+                                        <div className="md:col-span-2 space-y-1">
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Başlık</label>
+                                            <input
+                                                type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)}
+                                                placeholder="Liste başlığı (opsiyonel)"
+                                                className="w-full px-3 py-2 bg-white border border-gray-100 rounded-xl text-sm font-medium text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#663259]/20 transition-all"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Tarih</label>
+                                            <DatePicker value={editDate} onChange={setEditDate} icon="event" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Toplam Tutar (₺)</label>
+                                            <input
+                                                type="text" inputMode="decimal" value={editTotal} onChange={(e) => setEditTotal(formatAmountInput(e.target.value))}
+                                                placeholder="0,00"
+                                                className="w-full px-3 py-2 bg-white border border-gray-100 rounded-xl text-sm font-black text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#663259]/20 transition-all"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
                                 <table className="w-full text-left border-collapse">
                                     <thead>
                                         <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
                                             <th className="py-2">Alıcı</th>
                                             <th className="py-2 text-right">Kayıttaki Borç</th>
-                                            <th className="py-2 text-right">Ödenen</th>
+                                            <th className="py-2 text-right w-44">Ödenen</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-50">
-                                        {detail.items.map((it) => (
-                                            <tr key={it.id}>
-                                                <td className="py-2.5 text-sm font-bold text-gray-700">
-                                                    {it.companyName || it.manualName || '—'}
-                                                    {!it.companyId && <span className="ml-2 text-[9px] font-black text-amber-500 uppercase">Manuel</span>}
-                                                </td>
-                                                <td className="py-2.5 text-right text-sm font-bold text-gray-400">{it.companyId ? fmt(Math.abs(it.balanceSnapshot)) : '—'}</td>
-                                                <td className="py-2.5 text-right text-sm font-black text-emerald-600">{fmt(it.amount)}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
+                                    {!editing ? (
+                                        <tbody className="divide-y divide-gray-50">
+                                            {detail.items.map((it) => (
+                                                <tr key={it.id}>
+                                                    <td className="py-2.5 text-sm font-bold text-gray-700">
+                                                        {it.companyName || it.manualName || '—'}
+                                                        {!it.companyId && <span className="ml-2 text-[9px] font-black text-amber-500 uppercase">Manuel</span>}
+                                                    </td>
+                                                    <td className="py-2.5 text-right text-sm font-bold text-gray-400">{it.companyId ? fmt(Math.abs(it.balanceSnapshot)) : '—'}</td>
+                                                    <td className="py-2.5 text-right text-sm font-black text-emerald-600">{fmt(it.amount)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    ) : (
+                                        <tbody className="divide-y divide-gray-50">
+                                            {editItems.map((r) => (
+                                                <tr key={r.id} className={r.companyId ? '' : 'bg-amber-50/30'}>
+                                                    <td className="py-2 text-sm font-bold text-gray-700">
+                                                        {r.companyId ? (
+                                                            r.name
+                                                        ) : (
+                                                            <input
+                                                                type="text" value={r.name}
+                                                                onChange={(e) => setEditItems((rows) => rows.map((x) => x.id === r.id ? { ...x, name: e.target.value } : x))}
+                                                                placeholder="Manuel ödeme adı"
+                                                                className="w-full px-3 py-2 bg-white border border-amber-100 rounded-xl text-sm font-bold text-gray-700 focus:outline-none focus:ring-1 focus:ring-amber-300 transition-all"
+                                                            />
+                                                        )}
+                                                    </td>
+                                                    <td className="py-2 text-right text-sm font-bold text-gray-400">{r.companyId ? fmt(Math.abs(r.balanceSnapshot)) : <span className="text-[10px] font-black text-amber-500 uppercase">Manuel</span>}</td>
+                                                    <td className="py-2 text-right">
+                                                        <div className="flex items-center justify-end gap-1.5">
+                                                            <input
+                                                                type="text" inputMode="decimal" value={r.amount}
+                                                                onChange={(e) => setEditItems((rows) => rows.map((x) => x.id === r.id ? { ...x, amount: formatAmountInput(e.target.value) } : x))}
+                                                                placeholder="0,00"
+                                                                className="w-32 px-3 py-2 bg-white border border-gray-100 rounded-xl text-sm font-bold text-right text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#663259]/20 transition-all"
+                                                            />
+                                                            <button onClick={() => setEditItems((rows) => rows.filter((x) => x.id !== r.id))} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                                                                <Trash2 size={15} />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    )}
                                 </table>
+
+                                {editing && (
+                                    <div className="mt-3 flex items-center justify-between">
+                                        <button
+                                            onClick={() => setEditItems((rows) => [...rows, { id: generateId(), companyId: null, name: '', balanceSnapshot: 0, amount: '' }])}
+                                            className="flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-[#663259] hover:text-white border border-gray-100 rounded-xl text-xs font-bold text-gray-600 transition-all"
+                                        >
+                                            <Plus size={15} /> Manuel Satır
+                                        </button>
+                                        <div className="text-xs font-bold text-gray-500">
+                                            Dağıtılan: <span className="text-gray-800 font-black">{fmt(editAllocated)}</span>
+                                            <span className="mx-2 text-gray-300">·</span>
+                                            Kalan: <span className={`font-black ${editRemaining < 0 ? 'text-red-500' : 'text-emerald-600'}`}>{fmt(editRemaining)}</span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {editError && <p className="mt-3 text-sm font-bold text-red-500 text-right">{editError}</p>}
                             </div>
                         ) : detailLoading || historyLoading ? (
                             <div className="flex items-center justify-center py-20">

@@ -6,6 +6,7 @@ import { toKurus, toLira, unwrap } from './_financeSync';
 import type {
     PaymentListView,
     CreatePaymentListPayload,
+    UpdatePaymentListPayload,
 } from '@/types/backend/payment-list';
 
 export interface PaymentListSummary {
@@ -106,5 +107,28 @@ export const paymentListService = {
         const res = await api.post('/finance/payment-lists', payload);
         const v = unwrap<PaymentListView>(res.data);
         return v?.id ?? '';
+    },
+
+    async update(id: string, data: CreatePaymentListInput): Promise<PaymentListDetail | null> {
+        const payload: UpdatePaymentListPayload = {
+            title: data.title?.trim() || null,
+            note: data.note?.trim() || null,
+            paymentDate: data.paymentDate,
+            totalAmount: toKurus(data.totalAmount),
+            items: data.items.map((it, i) => ({
+                companyId: it.companyId ?? null,
+                manualName: it.manualName ?? null,
+                balanceSnapshot: toKurus(it.balanceSnapshot ?? 0),
+                amount: toKurus(it.amount),
+                sortOrder: it.sortOrder ?? i,
+            })),
+        };
+        const res = await api.patch(`/finance/payment-lists/${id}`, payload);
+        const v = unwrap<PaymentListView>(res.data);
+        return v ? mapDetail(v) : null;
+    },
+
+    async remove(id: string): Promise<void> {
+        await api.delete(`/finance/payment-lists/${id}`);
     },
 };
